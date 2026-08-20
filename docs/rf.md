@@ -6,7 +6,5 @@
 | **RF04** | Cadastro e Autenticação | Cliente | Permitir a criação de conta e login seguro para realizar compras. |
 | **RF05** | Vitrine e Busca | Cliente | Visualizar o catálogo, filtrar por categorias (Íntima/Fitness) e buscar por nome. |
 | **RF06** | Carrinho de Compras | Cliente | Adicionar itens, alterar quantidades e visualizar o subtotal antes da compra. |
-| **RF07** | Cálculo de Frete | Cliente | Inserir o CEP para consultar opções de envio e valores de entrega em tempo real. |
-| **RF08** | Checkout de Pagamento | Cliente | Finalizar a compra inserindo dados de pagamento (cartão ou PIX) via integração. |
-| **RF09** | Acompanhamento | Cliente | Visualizar o histórico de compras e o status atual do pedido. |
-| **RF10** | Painel de Pedidos | Admin | Visualizar todos os pedidos recebidos, aprovar pagamentos e atualizar status de envio. |
+| **RF07** | Checkout de Pagamento | Cliente | Finalizar a compra inserindo dados de pagamento (cartão ou PIX) via integração. |
+| **RF08** | Painel de Pedidos | Admin | Visualizar todos os pedidos recebidos, aprovar pagamentos e atualizar status. |
