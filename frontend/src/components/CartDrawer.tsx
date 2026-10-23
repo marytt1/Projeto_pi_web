@@ -5,15 +5,17 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+
 type CartDrawerProps = {
   items: CartItem[];
   onClose: () => void;
   onChangeQuantity: (id: string, delta: number) => void;
   onRemove: (id: string) => void;
+  onCheckout?: () => void; // ex: navegar para /carrinho
 };
 
 // Componente do Painel flutuante do carrinho de compras que lista os itens, permite alterar quantidades e calcula o subtotal
-export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove }: CartDrawerProps) {
+export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove, onCheckout }: CartDrawerProps) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   return (
@@ -78,7 +80,10 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove 
           <span className="font-semibold text-[#3a3a3a]">{formatPrice(subtotal)}</span>
         </div>
         <div className="flex gap-2">
-          <button className="flex-1 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-2.5 rounded-full">
+          <button
+            onClick={onCheckout}
+            className="flex-1 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-2.5 rounded-full"
+          >
             Finalizar
           </button>
           <button
@@ -92,5 +97,3 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove 
     </div>
   );
 }
-
-

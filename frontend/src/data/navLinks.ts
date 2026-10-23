@@ -1,14 +1,12 @@
 import type { NavLink } from "../types/nav";
 
-// Links do menu no topo (desktop)
+// Links de navegação
 export const NAV_LINKS: NavLink[] = [
-  { label: "Catálogo", href: "#" },
-  { label: "Provador", href: "#" },
-  { label: "Novidades", href: "#" },
+  { label: "Catálogo", href: "/catalogo" },
+  { label: "Provador", href: "/#guia-tamanhos" },
+  { label: "Novidades", href: "/#produtos" },
+  { label: "Contato", href: "#contato" },
 ];
 
-// Links do menu "drawer" (mobile)
-export const DRAWER_LINKS: NavLink[] = [
-  ...NAV_LINKS,
-  { label: "Contato", href: "#" },
-];
+// O menu lateral usa os mesmos links da barra horizontal
+export const DRAWER_LINKS: NavLink[] = NAV_LINKS;

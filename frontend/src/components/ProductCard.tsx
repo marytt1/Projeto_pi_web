@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { Product, ProductBadgeTone } from "../types/product";
+import { useShop } from "./ShopContext";
 
 type ProductCardProps = {
   product: Product;
@@ -17,6 +19,19 @@ function formatPrice(value: number) {
 
 // Componente do Card de produto em destaque que exibe foto, selo personalizado, preço com desconto, opções de cores, tamanhos e botão de compra
 export default function ProductCard({ product }: ProductCardProps) {
+  
+  const { addToCart } = useShop();
+
+  const [selectedColor, setSelectedColor] = useState(product.colors[0]);
+  const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
+  const [added, setAdded] = useState(false);
+
+  function handleAddToCart() {
+    addToCart(product, selectedSize, selectedColor);
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
+
   return (
     <article className="group">
       <div className="relative overflow-hidden bg-neutral-100 aspect-[3/4]">
@@ -59,9 +74,15 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex items-center gap-1.5 mt-3">
           {product.colors.map((color) => (
-            <span
+            <button
               key={color}
-              className="w-4 h-4 rounded-full border border-black/10"
+              onClick={() => setSelectedColor(color)}
+              aria-label={`Cor ${color}`}
+              className={`w-4 h-4 rounded-full border ${
+                selectedColor === color
+                  ? "border-[#8b1538] ring-1 ring-[#8b1538] ring-offset-1"
+                  : "border-black/10"
+              }`}
               style={{ backgroundColor: color }}
             />
           ))}
@@ -69,24 +90,32 @@ export default function ProductCard({ product }: ProductCardProps) {
 
         <div className="flex items-center gap-2 mt-3">
           {product.sizes.map((size) => (
-            <span
+            <button
               key={size}
-              className="text-[11px] w-6 h-6 flex items-center justify-center rounded-full border border-neutral-300 text-neutral-500"
+              onClick={() => setSelectedSize(size)}
+              className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full border transition-colors ${
+                selectedSize === size
+                  ? "bg-[#8b1538] border-[#8b1538] text-white"
+                  : "border-neutral-300 text-neutral-500"
+              }`}
             >
               {size}
-            </span>
+            </button>
           ))}
         </div>
 
         <button
           disabled={product.soldOut}
+          onClick={handleAddToCart}
           className={`mt-4 w-full text-sm font-medium py-2.5 rounded-full transition-colors ${
             product.soldOut
               ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
+              : added
+              ? "bg-emerald-600 text-white"
               : "bg-[#8b1538] hover:bg-[#71102d] text-white"
           }`}
         >
-          {product.soldOut ? "Produto Esgotado" : "🛍  Adicionar ao Carrinho"}
+          {product.soldOut ? "Produto Esgotado" : added ? "✓ Adicionado!" : "🛍  Adicionar ao Carrinho"}
         </button>
       </div>
     </article>

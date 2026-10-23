@@ -7,9 +7,9 @@ import croppedGrazyImg from "../assets/cropped-grazy.jpeg";
 
 // Principais Categorias 
 export const CATEGORIES: CategoryItem[] = [
-  { id: "tops", label: "Tops", image: topAliceImg },
-  { id: "croppeds", label: "Croppeds", image: croppedGrazyImg },
-  { id: "shorts", label: "Shorts", image: shortsPietraImg },
-  { id: "macacoes", label: "Macacões", image: macaquinhoPaolaImg },
+  { id: "tops", label: "Tops", filter: "Top", image: topAliceImg },
+  { id: "croppeds", label: "Croppeds", filter: "Cropped", image: croppedGrazyImg },
+  { id: "shorts", label: "Shorts", filter: "Shorts", image: shortsPietraImg },
+  { id: "macacoes", label: "Macacões", filter: "Macaquinho", image: macaquinhoPaolaImg },
   { id: "leggings", label: "Leggings", image: leggingEloaImg},
 ];

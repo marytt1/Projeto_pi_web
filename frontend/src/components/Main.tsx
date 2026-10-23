@@ -1,5 +1,8 @@
-import { useState } from "react";
-import heroImage from "../assets/banner.jpg";
+import { useState, useEffect } from "react";
+import { Link } from "react-router";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import banner1 from "../assets/neon_banner.png";
+import banner2 from "../assets/basic_banner.png";
 
 import Section from "./Section";
 import ProductCard from "./ProductCard";
@@ -12,6 +15,8 @@ import { CATEGORIES } from "../data/categories";
 import { VIDEOS } from "../data/videos";
 import { FEATURES } from "../data/features";
 import { SIZE_TABLE } from "../data/sizeTable";
+import { calculateSize } from "../components/Size";
+import type { SizeResult } from "../types/size";
 import { INSTAGRAM_POSTS } from "../data/instagram";
 
 const HIDE_SCROLLBAR =
@@ -34,43 +39,80 @@ export default function Main() {
   );
 }
 
+const HERO_SLIDES = [
+  { image: banner1, alt: "Modelos vestindo peças de fitness wear La Rose" },
+  { image: banner2, alt: "Coleção La Rose" },
+];
+
+const HERO_INTERVAL = 5000;
 
 function Hero() {
+  
+  const [current, setCurrent] = useState(0);
+  const total = HERO_SLIDES.length;
+
+  
+  function goPrev() {
+    setCurrent((prev) => (prev - 1 + total) % total);
+  }
+  function goNext() {
+    setCurrent((prev) => (prev + 1) % total);
+  }
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % total);
+    }, HERO_INTERVAL);
+
+    
+    return () => clearInterval(timer);
+  }, [current, total]);
+
   return (
-    <section className="relative">
-      <img
-        src={heroImage}
-        alt="Modelos vestindo peças de fitness wear La Rose"
-        className="w-full h-[420px] md:h-[560px] object-cover"
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/10 to-transparent" />
-      <div className="absolute inset-0 flex flex-col justify-center px-6 md:px-16 text-white max-w-xl">
-        <p className="text-xs tracking-widest uppercase mb-3 text-white/80">
-          Santa Cruz das Palmeiras · SP
-        </p>
-        <h2 className="font-serif text-4xl md:text-6xl leading-tight">
-          Elegância que
-          <br />
-          <span className="italic">abraça você</span>
-        </h2>
-        <p className="mt-4 text-sm md:text-base text-white/90 max-w-sm">
-          Lingerie e fitness wear selecionados para celebrar cada curva com
-          sofisticação e conforto real.
-        </p>
-        <div className="flex flex-wrap gap-4 mt-8">
-          <a
-            href="#produtos"
-            className="bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium px-6 py-3 rounded-full"
-          >
-            Explorar Coleção →
-          </a>
-          <a
-            href="#guia-tamanhos"
-            className="bg-white/90 hover:bg-white transition-colors text-[#3a3a3a] text-sm font-medium px-6 py-3 rounded-full"
-          >
-            Guia de Tamanhos
-          </a>
-        </div>
+    <section className="relative h-[420px] md:h-[560px] overflow-hidden">
+      {HERO_SLIDES.map((slide, index) => (
+        <Link
+          key={index}
+          to="/catalogo"
+          aria-label="Ver o catálogo"
+          tabIndex={index === current ? 0 : -1}
+          className={`absolute inset-0 transition-opacity duration-700 ${
+            index === current ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <img src={slide.image} alt={slide.alt} className="w-full h-full object-cover" />
+        </Link>
+      ))}
+
+      <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/10 to-transparent pointer-events-none" />
+
+      <button
+        onClick={goPrev}
+        aria-label="Imagem anterior"
+        className="absolute left-3 md:left-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/70 hover:bg-white text-[#8b1538] flex items-center justify-center transition-colors"
+      >
+        <ChevronLeft size={22} />
+      </button>
+
+      <button
+        onClick={goNext}
+        aria-label="Próxima imagem"
+        className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/70 hover:bg-white text-[#8b1538] flex items-center justify-center transition-colors"
+      >
+        <ChevronRight size={22} />
+      </button>
+
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+        {HERO_SLIDES.map((_, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrent(index)}
+            aria-label={`Ir para imagem ${index + 1}`}
+            className={`h-2 rounded-full transition-all ${
+              index === current ? "w-6 bg-white" : "w-2 bg-white/50"
+            }`}
+          />
+        ))}
       </div>
     </section>
   );
@@ -91,7 +133,7 @@ function CategoryShowcase() {
 
 
 function FeaturedProducts() {
- const [active, setActive] = useState<(typeof FILTERS)[number]>("Todos");
+  const [active, setActive] = useState<(typeof FILTERS)[number]>("Todos");
 
   const filtered =
     active === "Todos" ? PRODUCTS : PRODUCTS.filter((p) => p.category === active);
@@ -99,6 +141,7 @@ function FeaturedProducts() {
   return (
     <Section
       id="produtos"
+      className="scroll-mt-32" // evita o título ficar escondido atrás do Header fixo
       eyebrow="Nossa Coleção Pilates"
       title="Produtos em Destaque"
       align="start"
@@ -129,7 +172,6 @@ function FeaturedProducts() {
   );
 }
 
-
 function VideoDetails() {
   return (
     <Section title="Descubra cada detalhe em vídeo">
@@ -143,12 +185,32 @@ function VideoDetails() {
 }
 
 function SizeGuide() {
-  
   const [measurements, setMeasurements] = useState({
     bust: "",
     waist: "",
     hip: "",
   });
+
+  // Resultado do cálculo (null = ainda não calculou) e mensagem de erro
+  const [result, setResult] = useState<SizeResult | null>(null);
+  const [sizeError, setSizeError] = useState("");
+
+  // Roda quando clica em "Calcular Meu Tamanho"
+  function handleCalculate() {
+    const bust = Number(measurements.bust);
+    const waist = Number(measurements.waist);
+    const hip = Number(measurements.hip);
+
+    // As três medidas são obrigatórias e precisam ser números positivos
+    if (![bust, waist, hip].every((value) => value > 0)) {
+      setResult(null);
+      setSizeError("Preencha busto, cintura e quadril para calcular.");
+      return;
+    }
+
+    setSizeError("");
+    setResult(calculateSize(bust, waist, hip));
+  }
 
   return (
     <Section
@@ -156,7 +218,7 @@ function SizeGuide() {
       eyebrow="Ferramenta de Medidas"
       title="Guia de Tamanhos & Provador Virtual"
       description="Informe suas medidas e encontre o tamanho ideal para cada peça da coleção La Rose."
-      className="bg-[#faf5f2]"
+      className="bg-[#faf5f2] scroll-mt-32"
     >
       <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
         <div className="bg-white rounded-2xl p-8">
@@ -190,9 +252,46 @@ function SizeGuide() {
             ))}
           </div>
 
-          <button className="mt-8 w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full">
+          <button
+            onClick={handleCalculate}
+            className="mt-8 w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full"
+          >
             ✏️ Calcular Meu Tamanho
           </button>
+
+          
+          {sizeError && <p className="text-xs text-red-600 mt-3 text-center">{sizeError}</p>}
+
+          
+          {result?.status === "ok" && (
+            <div className="mt-5 rounded-xl bg-[#faf1f0] p-4 text-center">
+              <p className="text-xs text-neutral-500">Seu tamanho ideal</p>
+              <p className="font-serif text-4xl text-[#8b1538] my-1">{result.size}</p>
+
+              <ul className="text-xs text-neutral-600 mt-2 space-y-0.5">
+                {result.details.map((detail) => (
+                  <li key={detail.label}>
+                    {detail.label} {detail.value} cm → {detail.size}
+                  </li>
+                ))}
+              </ul>
+
+              
+              {result.mixed && (
+                <p className="text-[11px] text-neutral-500 mt-3">
+                  Suas medidas indicam tamanhos diferentes. Recomendamos o maior ({result.size}) para
+                  não ficar apertado.
+                </p>
+              )}
+            </div>
+          )}
+
+          {result?.status === "above" && (
+            <p className="mt-5 rounded-xl bg-[#faf1f0] p-4 text-xs text-center text-[#5c0f1c]">
+              Alguma medida passa do maior tamanho da tabela (GG). Fale com a gente pelo WhatsApp
+              que ajudamos a encontrar a melhor opção.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-6">
@@ -209,7 +308,12 @@ function SizeGuide() {
               </thead>
               <tbody>
                 {SIZE_TABLE.map((row) => (
-                  <tr key={row.size} className="border-t border-neutral-100">
+                  <tr
+                    key={row.size}
+                    className={`border-t border-neutral-100 ${
+                      result?.status === "ok" && result.size === row.size ? "bg-[#faf1f0]" : ""
+                    }`}
+                  >
                     <td className="py-3">
                       <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#8b1538] text-white text-xs">
                         {row.size}
@@ -273,6 +377,7 @@ function InstagramFeed() {
         <span className="text-sm text-white ml-1">@larose_modaintima</span>
       </div>
 
+      
       <div className="grid grid-cols-3 md:grid-cols-6">
         {INSTAGRAM_POSTS.map((post) => (
           <a

@@ -1,20 +1,18 @@
 import { useState, useRef, useEffect } from "react";
-import { Menu, Heart, ShoppingBag, User, Search, X, ChevronRight } from "lucide-react";
-import type { NavLink } from "../types/nav";
+import { Link, NavLink, useNavigate } from "react-router";
+import { Menu, Heart, ShoppingBag, User, X, ChevronRight } from "lucide-react";
+import type { NavLink as NavLinkType } from "../types/nav";
 import { NAV_LINKS, DRAWER_LINKS } from "../data/navLinks";
-import type { CartItem } from "../types/cart";
-import { INITIAL_CART } from "../data/cart";
-import type { FavoriteItem } from "../types/favorite";
-import { INITIAL_FAVORITES } from "../data/favorites";
+import { useShop } from "./ShopContext";
+import { useAuth } from "./AuthContext";
 import CartDrawer from "./CartDrawer";
 import FavoritesDrawer from "./FavoritesDrawer";
 import AccountMenu from "./AccountMenu";
-import AuthModal from "./AuthModal";
+import SearchBar from "./Searchbar";
 
 type HeaderProps = {
-  navLinks?: NavLink[];
-  drawerLinks?: NavLink[];
-  onOpenAdmin?: () => void;
+  navLinks?: NavLinkType[];
+  drawerLinks?: NavLinkType[];
 };
 
 type OpenPopover = "cart" | "favorites" | "account" | null;
@@ -23,15 +21,18 @@ type OpenPopover = "cart" | "favorites" | "account" | null;
 export default function Header({
   navLinks = NAV_LINKS,
   drawerLinks = DRAWER_LINKS,
-  onOpenAdmin,
 }: HeaderProps) {
+  
+  const navigate = useNavigate();
+
+  // Estado: menu lateral (drawer) aberto ou fechado
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const [cart, setCart] = useState<CartItem[]>(INITIAL_CART);
-  const [favorites, setFavorites] = useState<FavoriteItem[]>(INITIAL_FAVORITES);
+  const { cart, favorites, changeQuantity, removeFromCart, removeFavorite } = useShop();
 
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
-  const [isLoggedIn] = useState(true);
+
+  const { user, isAdmin, logout, openAuthModal } = useAuth();
 
   const iconsRef = useRef<HTMLDivElement>(null);
 
@@ -48,47 +49,57 @@ export default function Header({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openPopover]);
 
-  const [authModalMode, setAuthModalMode] = useState<"entrar" | "cadastrar" | null>(null);
-
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   function togglePopover(popover: OpenPopover) {
     setOpenPopover((current) => (current === popover ? null : popover));
   }
 
+  // Ícone de usuário: logado abre o menu da conta; visitante abre o login
   function handleUserIconClick() {
-    if (isLoggedIn) {
+    if (user) {
       togglePopover("account");
     } else {
-      setAuthModalMode("entrar");
+      openAuthModal("entrar");
     }
   }
 
-  function changeCartQuantity(id: string, delta: number) {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
-      )
-    );
+  // Favoritos e carrinho exigem login: visitante recebe o modal de login
+  function handleProtectedIconClick(popover: "cart" | "favorites", message: string) {
+    if (!user) {
+      openAuthModal("entrar", message);
+      return;
+    }
+    togglePopover(popover);
   }
 
-  function removeCartItem(id: string) {
-    setCart((prev) => prev.filter((item) => item.id !== id));
+  // Sair: encerra a sessão e volta para a Home como visitante
+  function handleLogout() {
+    logout();
+    setOpenPopover(null);
+    setMenuOpen(false);
+    navigate("/");
   }
 
-  function removeFavorite(id: string) {
-    setFavorites((prev) => prev.filter((item) => item.id !== id));
+  // Busca do site: leva pro catálogo com o termo na URL (?busca=...).
+  function handleSearch(term: string) {
+    setOpenPopover(null);
+    setMenuOpen(false);
+    navigate(term ? `/catalogo?busca=${encodeURIComponent(term)}` : "/catalogo");
   }
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
+      
       <div className="hidden md:flex items-center justify-center gap-8 bg-[#5c0f1c] text-white text-xs py-2 px-4">
         <span>BRL (R$) / PT-BR</span>
         <span>Troca gratuita em até 30 dias</span>
+        <span>Frete grátis a partir de R$600,00</span>
         <span>Descubra seu tamanho ideal La Rose</span>
         <span>Atendimento Presencial em Santa Cruz das Palmeiras - SP</span>
       </div>
 
+      
       <div className="flex items-center justify-between px-6 md:px-10 py-4">
         <button
           className="md:hidden text-[#5c0f1c]"
@@ -106,36 +117,41 @@ export default function Header({
           >
             <Menu size={22} />
           </button>
-          <h1 className="font-serif italic text-3xl text-[#8b1538] tracking-wide">
+
+          
+          <Link to="/" className="font-serif italic text-3xl text-[#8b1538] tracking-wide">
             La Rose
-          </h1>
+          </Link>
         </div>
 
-        <nav className="hidden md:flex items-center gap-10 text-sm font-medium tracking-wide text-[#3a3a3a]">
+        
+        <nav className="hidden md:flex items-center gap-10 text-sm font-medium tracking-wide">
           {navLinks.map((link) => (
-            <a
+            <NavLink
               key={link.label}
-              href={link.href}
-              className="hover:text-[#8b1538] transition-colors"
+              to={link.href}
+              end
+              className={({ isActive }) =>
+                // links com "#" (âncora) não ficam marcados como ativos
+                isActive && !link.href.includes("#")
+                  ? "text-[#8b1538]"
+                  : "text-[#3a3a3a] hover:text-[#8b1538] transition-colors"
+              }
             >
               {link.label}
-            </a>
+            </NavLink>
           ))}
         </nav>
 
+        
         <div ref={iconsRef} className="flex items-center gap-5 relative">
-          <div className="hidden lg:flex items-center gap-2 border border-neutral-200 rounded-full px-4 py-2 w-64">
-            <Search size={16} className="text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Buscar peças..."
-              className="text-sm outline-none w-full placeholder:text-neutral-400"
-            />
-          </div>
+          
+          <SearchBar onSearch={handleSearch} className="hidden lg:flex w-64" />
 
+          
           <div className="relative">
             <button
-              onClick={() => togglePopover("favorites")}
+              onClick={() => handleProtectedIconClick("favorites", "Faça login para ver seus favoritos.")}
               aria-label="Favoritos"
               className="text-[#3a3a3a] hover:text-[#8b1538]"
             >
@@ -150,9 +166,10 @@ export default function Header({
             )}
           </div>
 
+          
           <div className="relative">
             <button
-              onClick={() => togglePopover("cart")}
+              onClick={() => handleProtectedIconClick("cart", "Faça login para ver seu carrinho.")}
               aria-label="Carrinho"
               className="relative text-[#3a3a3a] hover:text-[#8b1538]"
             >
@@ -165,13 +182,19 @@ export default function Header({
               <CartDrawer
                 items={cart}
                 onClose={() => setOpenPopover(null)}
-                onChangeQuantity={changeCartQuantity}
-                onRemove={removeCartItem}
+                onChangeQuantity={changeQuantity}
+                onRemove={removeFromCart}
+                // "Finalizar" leva pra rota /carrinho e fecha o popover
+                onCheckout={() => {
+                  setOpenPopover(null);
+                  navigate("/carrinho");
+                }}
               />
             )}
           </div>
 
-           <div className="relative">
+          
+          <div className="relative">
             <button
               onClick={handleUserIconClick}
               aria-label="Conta"
@@ -179,23 +202,24 @@ export default function Header({
             >
               <User size={20} />
             </button>
-            {openPopover === "account" && (
+            {openPopover === "account" && user && (
               <AccountMenu
-                userName="Admin"
-                isAdmin
+                userName={user.name.split(" ")[0]}
+                isAdmin={isAdmin}
                 onClose={() => setOpenPopover(null)}
-                onOpenAdmin={onOpenAdmin}
+                onOpenAdmin={() => {
+                  setOpenPopover(null);
+                  navigate("/admin");
+                }}
+                onLogout={handleLogout}
               />
             )}
           </div>
         </div>
       </div>
 
-      {authModalMode && (
-        <AuthModal initialMode={authModalMode} onClose={() => setAuthModalMode(null)} />
-      )}
-
-       <div
+      
+      <div
         onClick={() => setMenuOpen(false)}
         className={`fixed inset-0 bg-black/40 z-40 transition-opacity ${
           menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -218,38 +242,78 @@ export default function Header({
           </button>
         </div>
 
-       <nav className="flex-1 overflow-y-auto py-2">
+        
+        <div className="px-6 pt-4 lg:hidden">
+          <SearchBar onSearch={handleSearch} className="flex w-full" />
+        </div>
+
+        
+        <nav className="flex-1 overflow-y-auto py-2">
           {drawerLinks.map((link) => (
-            <a
+            <Link
               key={link.label}
-              href={link.href}
+              to={link.href}
+              onClick={() => setMenuOpen(false)}
               className="flex items-center justify-between px-6 py-4 text-sm text-[#3a3a3a] border-b border-neutral-50 hover:bg-neutral-50 transition-colors"
             >
               {link.label}
               <ChevronRight size={16} className="text-neutral-300" />
-            </a>
+            </Link>
           ))}
         </nav>
 
-         <div className="px-6 py-6 border-t border-neutral-100 flex flex-col gap-3">
-          <button
-            onClick={() => {
-              setAuthModalMode("entrar");
-              setMenuOpen(false);
-            }}
-            className="w-full text-sm font-medium py-3 rounded-full border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0] transition-colors"
-          >
-            Entrar na Conta
-          </button>
-          <button
-            onClick={() => {
-              setAuthModalMode("cadastrar");
-              setMenuOpen(false);
-            }}
-            className="w-full text-sm font-medium py-3 rounded-full bg-[#8b1538] text-white hover:bg-[#71102d] transition-colors"
-          >
-            Criar Conta Grátis
-          </button>
+        <div className="px-6 py-6 border-t border-neutral-100 flex flex-col gap-3">
+          {user ? (
+            <>
+              
+              <p className="text-xs text-neutral-400">Olá, {user.name.split(" ")[0]}</p>
+              <Link
+                to="/conta"
+                onClick={() => setMenuOpen(false)}
+                className="w-full text-center text-sm font-medium py-3 rounded-full border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0] transition-colors"
+              >
+                Configurações da Conta
+              </Link>
+              
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="w-full text-center text-sm font-medium py-3 rounded-full bg-[#8b1538] text-white hover:bg-[#71102d] transition-colors"
+                >
+                  Painel Administrativo
+                </Link>
+              )}
+              <button
+                onClick={handleLogout}
+                className="w-full text-sm font-medium py-2 text-[#8b1538]"
+              >
+                Sair
+              </button>
+            </>
+          ) : (
+            <>
+              
+              <button
+                onClick={() => {
+                  openAuthModal("entrar");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-sm font-medium py-3 rounded-full border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0] transition-colors"
+              >
+                Entrar na Conta
+              </button>
+              <button
+                onClick={() => {
+                  openAuthModal("cadastrar");
+                  setMenuOpen(false);
+                }}
+                className="w-full text-sm font-medium py-3 rounded-full bg-[#8b1538] text-white hover:bg-[#71102d] transition-colors"
+              >
+                Criar Conta Grátis
+              </button>
+            </>
+          )}
         </div>
       </div>
     </header>

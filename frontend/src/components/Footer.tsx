@@ -1,10 +1,11 @@
 import { MessageCircle } from "lucide-react";
+import { Link } from "react-router";
 import InstagramIcon from "./icons/InstagramIcon";
 
 // Componente do Rodapé do site com informações da marca, links de navegação, endereço físico e redes sociais
 export default function Footer() {
   return (
-    <footer className="bg-[#1c1c1c] text-white/80 px-6 md:px-10 py-14">
+    <footer id="contato" className="bg-[#1c1c1c] text-white/80 px-6 md:px-10 py-14">
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-10">
         <div>
           <h2 className="font-serif italic text-2xl text-white mb-3">
@@ -15,30 +16,30 @@ export default function Footer() {
             Palmeiras – SP.
           </p>
         </div>
-
+ 
         <div>
           <h3 className="text-xs tracking-widest uppercase text-white/40 mb-4">
             Coleções
           </h3>
           <ul className="space-y-2 text-sm">
             <li>
-              <a href="#" className="hover:text-white transition-colors">
+              <Link to="/catalogo" className="hover:text-white transition-colors">
                 Catálogo
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white transition-colors">
+              <Link to="/#guia-tamanhos" className="hover:text-white transition-colors">
                 Provador
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white transition-colors">
+              <Link to="/#produtos" className="hover:text-white transition-colors">
                 Novidades
-              </a>
+              </Link>
             </li>
           </ul>
         </div>
-
+ 
         <div>
           <h3 className="text-xs tracking-widest uppercase text-white/40 mb-4">
             Atendimento Presencial
@@ -68,10 +69,11 @@ export default function Footer() {
           </div>
         </div>
       </div>
-
+ 
       <div className="border-t border-white/10 mt-12 pt-6 text-xs text-white/40 text-center">
         © {new Date().getFullYear()} La Rose. Todos os direitos reservados.
       </div>
     </footer>
   );
 }
+ 
