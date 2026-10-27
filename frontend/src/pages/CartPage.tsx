@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Minus, Plus, Trash2, MessageCircle } from "lucide-react";
 import { useShop } from "../components/ShopContext";
 import { useAuth } from "../components/AuthContext";
+import { buildWhatsAppLink } from "../data/links";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -9,11 +10,10 @@ function formatPrice(value: number) {
 
 // Página de carrinho de compras que permite gerenciar os itens, preencher os dados de identificação e enviar o pedido diretamente via WhatsApp
 export default function CartPage() {
-  
   const { cart, changeQuantity, removeFromCart } = useShop();
 
   const { user } = useAuth();
-  const [form, setForm] = useState({ name: user?.name ?? "", email: user?.email ?? "", whatsapp: "" });
+  const [form, setForm] = useState({ name: user?.name ?? "", email: user?.email ?? "" });
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -21,14 +21,28 @@ export default function CartPage() {
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const canSubmit = form.name.trim() !== "" && form.whatsapp.trim() !== "" && cart.length > 0;
+  const canSubmit = form.name.trim() !== "" && cart.length > 0;
 
   function handleSendOrder() {
     const itemsText = cart
-      .map((item) => `- ${item.name} (${item.size}/${item.colorName}) x${item.quantity}`)
-      .join("%0A");
-    const message = `Olá! Meu nome é ${form.name}. Gostaria de fazer o seguinte pedido:%0A${itemsText}%0ASubtotal: ${formatPrice(subtotal)}`;
-    window.open(`https://wa.me/?text=${message}`, "_blank");
+      .map(
+        (item) =>
+          `- ${item.name} (${item.size} / ${item.colorName}) x${item.quantity} - ${formatPrice(item.price * item.quantity)}`
+      )
+      .join("\n");
+
+    const lines = [
+      "Olá! Gostaria de fazer o seguinte pedido:",
+      "",
+      itemsText,
+      "",
+      `Subtotal: ${formatPrice(subtotal)}`,
+      "",
+      `Nome: ${form.name.trim()}`,
+    ];
+    if (form.email.trim()) lines.push(`Email: ${form.email.trim()}`);
+
+    window.open(buildWhatsAppLink(lines.join("\n")), "_blank");
   }
 
   return (
@@ -95,7 +109,7 @@ export default function CartPage() {
           <div className="bg-white rounded-2xl shadow p-6 h-fit">
             <h2 className="font-medium text-lg mb-1">Identificação</h2>
             <p className="text-sm text-neutral-400 mb-6">
-              Complete seus dados para finalizar a sua compra
+              Informe seu nome. O pedido será enviado para o WhatsApp da loja.
             </p>
 
             <div className="flex flex-col gap-4">
@@ -108,16 +122,9 @@ export default function CartPage() {
               />
               <input
                 type="email"
-                placeholder="Email (receba confirmação)"
+                placeholder="Email (opcional)"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#8b1538]"
-              />
-              <input
-                type="text"
-                placeholder="WhatsApp * (ex: 19 99999-0000)"
-                value={form.whatsapp}
-                onChange={(e) => updateField("whatsapp", e.target.value)}
                 className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#8b1538]"
               />
             </div>
@@ -137,7 +144,7 @@ export default function CartPage() {
 
             {!canSubmit && (
               <p className="text-xs text-neutral-400 text-center mt-3">
-                Preencha nome e WhatsApp para continuar
+                Preencha seu nome para continuar
               </p>
             )}
           </div>
