@@ -5,7 +5,6 @@ export type OrderStatus = "Aguardando" | "Confirmado" | "Enviado" | "Entregue";
 export type Order = {
   id: string; 
   customerName: string;
-  customerPhone: string;
   items: string; 
   total: number;
   date: string; 

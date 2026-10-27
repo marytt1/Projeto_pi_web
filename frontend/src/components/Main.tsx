@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MessageCircle } from "lucide-react";
 import banner1 from "../assets/neon_banner.png";
 import banner2 from "../assets/basic_banner.png";
 
@@ -18,6 +18,7 @@ import { SIZE_TABLE } from "../data/sizeTable";
 import { calculateSize } from "../components/Size";
 import type { SizeResult } from "../types/size";
 import { INSTAGRAM_POSTS } from "../data/instagram";
+import { STORE_LINKS } from "../data/links";
 
 const HIDE_SCROLLBAR =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
@@ -32,6 +33,7 @@ export default function Main() {
       <CategoryShowcase />
       <FeaturedProducts />
       <VideoDetails />
+      <VipGroup />
       <SizeGuide />
       <Features />
       <InstagramFeed />
@@ -175,12 +177,44 @@ function FeaturedProducts() {
 function VideoDetails() {
   return (
     <Section title="Descubra cada detalhe em vídeo">
-      <div className={`flex gap-4 overflow-x-auto pb-2 snap-x snap-mandatory ${HIDE_SCROLLBAR}`}>
+      <div className="flex flex-wrap justify-center items-center gap-4 py-4">
         {VIDEOS.map((video) => (
           <VideoCard key={video.id} video={video} />
         ))}
       </div>
     </Section>
+  );
+}
+
+function VipGroup() {
+  return (
+    <section className="px-6 md:px-10 py-6">
+      <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-[#5c0f1c] via-[#8b1538] to-[#c46b7e] text-white px-8 py-12 md:px-14 flex flex-col md:flex-row items-center gap-8 shadow-lg">
+        <span className="shrink-0 w-20 h-20 rounded-full bg-white/15 flex items-center justify-center">
+          <MessageCircle size={40} />
+        </span>
+ 
+        <div className="flex-1 text-center md:text-left">
+          <p className="text-xs tracking-widest uppercase text-white/70 mb-2">Grupo VIP</p>
+          <h2 className="font-serif text-3xl md:text-4xl leading-tight">
+            Novidades em primeira mão
+          </h2>
+          <p className="text-sm md:text-base text-white/85 mt-3 max-w-xl">
+            Entre no nosso grupo VIP no WhatsApp e receba lançamentos, promoções e avisos de
+            reposição antes de todo mundo.
+          </p>
+        </div>
+ 
+        <a
+          href={STORE_LINKS.vipGroup}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 bg-white text-[#8b1538] hover:bg-[#faf1f0] transition-colors text-sm font-semibold px-8 py-3.5 rounded-full shadow"
+        >
+          Entrar no grupo VIP
+        </a>
+      </div>
+    </section>
   );
 }
 
@@ -256,7 +290,7 @@ function SizeGuide() {
             onClick={handleCalculate}
             className="mt-8 w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full"
           >
-            ✏️ Calcular Meu Tamanho
+            Calcular Meu Tamanho
           </button>
 
           

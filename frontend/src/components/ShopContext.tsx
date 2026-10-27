@@ -13,6 +13,7 @@ type ShopContextType = {
   addToCart: (product: Product, size?: string, color?: string) => boolean;
   changeQuantity: (id: string, delta: number) => void;
   removeFromCart: (id: string) => void;
+  clearCart: () => void;
   toggleFavorite: (product: Product, size?: string, color?: string) => boolean;
   isFavorite: (productId: string) => boolean;
   removeFavorite: (id: string) => void;
@@ -75,6 +76,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setCart((prev) => prev.filter((item) => item.id !== id));
   }
 
+  function clearCart() {
+    setCart([]);
+  }
+
   function toggleFavorite(product: Product, size = product.sizes[0], color = product.colors[0]) {
     if (!requireLogin("Faça login para favoritar peças.")) return false;
 
@@ -113,6 +118,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         addToCart,
         changeQuantity,
         removeFromCart,
+        clearCart,
         toggleFavorite,
         isFavorite,
         removeFavorite,

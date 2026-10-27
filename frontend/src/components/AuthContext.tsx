@@ -3,22 +3,31 @@ import type { ReactNode } from "react";
 import type { User } from "../types/user";
 import { INITIAL_USERS } from "../data/users";
 
-// ---------------------------------------------------------------------
-// Estado global de AUTENTICAÇÃO: quem está logado (ou ninguém = visitante),
-// login, cadastro, sair, trocar senha e recuperar senha.
-//
-// ATENÇÃO: isto é uma SIMULAÇÃO de front-end. Os usuários ficam no
-// localStorage do navegador e a senha é guardada como texto. Num sistema
-// real isso é feito pela API/back-end (senha criptografada, token/sessão).
-// ---------------------------------------------------------------------
-
 const USERS_KEY = "larose_users";
 const SESSION_KEY = "larose_session";
+const RESETS_KEY = "larose_resets";
+const RESET_DURATION_MS = 15 * 60 * 1000; // o link vale por 15 minutos
+
+// Pedido de recuperação de senha: o "token" é o código que iria no link do email
+type ResetRequest = { token: string; email: string; expiresAt: number };
+
+function loadResets(): ResetRequest[] {
+  try {
+    const raw = localStorage.getItem(RESETS_KEY);
+    return raw ? (JSON.parse(raw) as ResetRequest[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveResets(list: ResetRequest[]) {
+  localStorage.setItem(RESETS_KEY, JSON.stringify(list));
+}
 
 // Resultado padrão das ações: deu certo ou não + mensagem pra mostrar na tela
 export type AuthResult = { ok: boolean; message: string };
 
-// Estado do modal de login: null = fechado
+// Estado do modal de login
 type AuthModalState = { mode: "entrar" | "cadastrar"; message?: string } | null;
 
 type AuthContextType = {
@@ -28,13 +37,20 @@ type AuthContextType = {
   register: (name: string, email: string, password: string) => AuthResult;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string) => AuthResult;
-  requestPasswordReset: (email: string) => AuthResult;
+
+  // Primeiro pede o link, e devolve o "token" que iria no email
+  requestPasswordReset: (email: string) => AuthResult & { token?: string };
+
+  // Depois (vai para página /redefinir-senha) confere o link e troca a senha
+  isResetTokenValid: (token: string) => boolean;
+  resetPassword: (token: string, newPassword: string) => AuthResult;
+
   // modal de login (aberto de qualquer lugar do site)
   authModal: AuthModalState;
   openAuthModal: (mode?: "entrar" | "cadastrar", message?: string) => void;
   closeAuthModal: () => void;
-  // Usada antes de ações que exigem login. Se for visitante, abre o modal
-  // de login e devolve false (a ação NÃO deve continuar).
+
+  // Usada antes de ações que exigem login
   requireLogin: (message?: string) => boolean;
 };
 
@@ -58,10 +74,11 @@ function loadSession(): string | null {
   }
 }
 
+// Estado global de AUTENTICAÇÃO: quem está logado (ou ninguém = visitante), login, cadastro, sair, trocar senha e recuperar senha.
+// Simulação com os usuários no localStorage do navegador.
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<User[]>(loadUsers);
-  // Guardamos só o EMAIL de quem está logado; o usuário completo é
-  // procurado na lista (assim, trocar a senha atualiza tudo sozinho).
+  
   const [sessionEmail, setSessionEmail] = useState<string | null>(loadSession);
   const [authModal, setAuthModal] = useState<AuthModalState>(null);
 
@@ -101,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { ok: false, message: "Já existe uma conta com esse email." };
     }
 
-    // Todo cadastro novo é "cliente". Só o admin de exemplo tem o perfil admin.
+    // Todo cadastro novo é "cliente"
     saveUsers([...users, { name: name.trim(), email: cleanEmail, password, role: "cliente" }]);
     startSession(cleanEmail);
     return { ok: true, message: "Conta criada." };
@@ -125,19 +142,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { ok: true, message: "Senha alterada com sucesso!" };
   }
 
-  // SIMULADO: um front-end não consegue enviar email. Num sistema real, aqui
-  // vai a chamada à API (ex: POST /auth/esqueci-senha) e o servidor manda o
-  // email com o link. A mensagem é a mesma exista o email ou não, pra não
-  // revelar quais emails têm conta.
-  function requestPasswordReset(email: string): AuthResult {
+  // Simulação da criação do token guardado no navegador, com o site levando para a página de redefinição de senha
+  function requestPasswordReset(email: string): AuthResult & { token?: string } {
     const cleanEmail = email.trim().toLowerCase();
+
     if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
       return { ok: false, message: "Informe um email válido." };
     }
-    return {
-      ok: true,
-      message: `Se ${cleanEmail} tiver cadastro, enviamos um link para redefinir a senha.`,
-    };
+    
+    if (!users.some((u) => u.email === cleanEmail)) {
+      return { ok: false, message: "Não encontramos uma conta com esse email." };
+    }
+
+    const token = crypto.randomUUID();
+  
+    const stillValid = loadResets().filter((r) => r.expiresAt > Date.now() && r.email !== cleanEmail);
+    saveResets([...stillValid, { token, email: cleanEmail, expiresAt: Date.now() + RESET_DURATION_MS }]);
+
+    return { ok: true, message: "Link de recuperação enviado.", token };
+  }
+
+  function isResetTokenValid(token: string): boolean {
+    return loadResets().some((r) => r.token === token && r.expiresAt > Date.now());
+  }
+
+  // Troca a senha de quem pediu a recuperação, com o link único
+  function resetPassword(token: string, newPassword: string): AuthResult {
+    const request = loadResets().find((r) => r.token === token && r.expiresAt > Date.now());
+    if (!request) {
+      return { ok: false, message: "Link inválido ou expirado. Peça um novo link." };
+    }
+    if (newPassword.length < 6) {
+      return { ok: false, message: "A nova senha precisa ter pelo menos 6 caracteres." };
+    }
+
+    saveUsers(users.map((u) => (u.email === request.email ? { ...u, password: newPassword } : u)));
+    saveResets(loadResets().filter((r) => r.token !== token)); 
+    return { ok: true, message: "Senha redefinida com sucesso!" };
   }
 
   function openAuthModal(mode: "entrar" | "cadastrar" = "entrar", message?: string) {
@@ -164,6 +205,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         changePassword,
         requestPasswordReset,
+        isResetTokenValid,
+        resetPassword,
         authModal,
         openAuthModal,
         closeAuthModal,
@@ -175,8 +218,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Hook: const { user, isAdmin, login } = useAuth();
-// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {

@@ -1,53 +1,26 @@
 import type { VideoItem } from "../types/video";
-import topAliceImg from "../assets/top-alice.jpeg";
-import shortsPietraImg from "../assets/shorts-pietra.jpeg";
-import macaquinhoPaolaImg from "../assets/macaquinho-paola.jpeg";
-import croppedJessicaImg from "../assets/cropped-manga-jessica.jpeg";
-import croppedGrazyImg from "../assets/cropped-grazy.jpeg";
+import v1 from "../assets/v1.mp4";
+import v2 from "../assets/v2.mp4";
+import v3 from "../assets/v3.mp4";
+import thumb1 from "../assets/image1.png";
+import thumb2 from "../assets/image2.png";
+import thumb3 from "../assets/image3.png";
 
 // Lista de vídeos simulados no momento a imagem estática
 export const VIDEOS: VideoItem[] = [
   {
     id: "v1",
-    caption: "Tecido com efeito modelador",
-    thumb: croppedJessicaImg,
-    productImage: croppedJessicaImg,
-    productName: "Cropped Manga Longa Jessica",
-    price: 189.9,
+    thumb: thumb1,
+    videoUrl: v1
   },
   {
     id: "v2",
-    caption: "Costura seamless, sem marcas",
-    thumb: macaquinhoPaolaImg,
-    productImage: macaquinhoPaolaImg,
-    productName: "Macaquinho Paola",
-    price: 219.9,
+    thumb: thumb2,
+    videoUrl: v2
   },
   {
     id: "v3",
-    caption: "Ela é de poliamida premium",
-    thumb: shortsPietraImg,
-    productImage: shortsPietraImg,
-    productName: "Shorts Pietra",
-    price: 129.9,
-    oldPrice: 159.9,
-  },
-  {
-    id: "v4",
-    caption: "Caimento perfeito",
-    thumb: croppedGrazyImg,
-    productImage: croppedGrazyImg,
-    productName: "Cropped Grazy",
-    price: 99.9,
-    oldPrice: 119.9,
-  },
-  {
-    id: "v5",
-    caption: "Elástico que não marca",
-    thumb: topAliceImg,
-    productImage: topAliceImg,
-    productName: "Top Alice",
-    price: 189.9,
-    oldPrice: 239.9,
-  },
-];
+    thumb: thumb3,
+    videoUrl: v3
+  }
+]

@@ -27,10 +27,11 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [added, setAdded] = useState(false);
 
   function handleAddToCart() {
-    addToCart(product, selectedSize, selectedColor);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  }
+  if (!addToCart(product, selectedSize, selectedColor)) return;
+
+  setAdded(true);
+  setTimeout(() => setAdded(false), 1500);
+}
 
   return (
     <article className="group">
@@ -115,7 +116,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               : "bg-[#8b1538] hover:bg-[#71102d] text-white"
           }`}
         >
-          {product.soldOut ? "Produto Esgotado" : added ? "✓ Adicionado!" : "🛍  Adicionar ao Carrinho"}
+          {product.soldOut ? "Produto Esgotado" : added ? "✓ Adicionado!" : "Adicionar ao Carrinho"}
         </button>
       </div>
     </article>

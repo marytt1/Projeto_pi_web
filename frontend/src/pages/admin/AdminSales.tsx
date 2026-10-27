@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Check, MessageCircle } from "lucide-react";
+import { Search, Check } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
 import { ORDERS } from "../../data/orders";
@@ -14,21 +14,21 @@ function formatPrice(value: number) {
 export default function AdminSales() {
   const [orders, setOrders] = useState<Order[]>(ORDERS);
   const [search, setSearch] = useState("");
-
+ 
   function confirmPayment(id: string) {
     setOrders((prev) =>
       prev.map((order) => (order.id === id ? { ...order, status: "Confirmado" } : order))
     );
   }
-
+ 
   const filteredOrders = orders.filter((order) =>
-    matchesSearch(search, order.id, order.customerName, order.customerPhone, order.items, order.status)
+    matchesSearch(search, order.id, order.customerName, order.items, order.status)
   );
-
+ 
   return (
     <div>
       <AdminTopBar title="Vendas e Pedidos" />
-
+ 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
           <h3 className="font-medium">Gestão de Pedidos</h3>
@@ -43,7 +43,7 @@ export default function AdminSales() {
             />
           </div>
         </div>
-
+ 
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-400 text-xs border-b border-neutral-100">
@@ -62,7 +62,6 @@ export default function AdminSales() {
                 <td className="px-6 py-4 text-neutral-400">{order.id}</td>
                 <td className="px-6 py-4">
                   <p className="font-medium">{order.customerName}</p>
-                  <p className="text-xs text-neutral-400">{order.customerPhone}</p>
                 </td>
                 <td className="px-6 py-4">{order.items}</td>
                 <td className="px-6 py-4 font-medium">{formatPrice(order.total)}</td>
@@ -71,18 +70,13 @@ export default function AdminSales() {
                   <StatusBadge status={order.status} />
                 </td>
                 <td className="px-6 py-4">
-                  {order.status === "Aguardando" ? (
+                  {order.status === "Aguardando" && (
                     <button
                       onClick={() => confirmPayment(order.id)}
                       className="flex items-center gap-1.5 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap"
                     >
                       <Check size={13} />
                       Confirmar Pgto &amp; Baixar Estoque
-                    </button>
-                  ) : (
-                    <button className="flex items-center gap-1.5 border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-2 rounded-full">
-                      <MessageCircle size={13} />
-                      WhatsApp
                     </button>
                   )}
                 </td>

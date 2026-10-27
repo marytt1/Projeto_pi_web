@@ -1,6 +1,7 @@
 import { MessageCircle } from "lucide-react";
 import { Link } from "react-router";
 import InstagramIcon from "./icons/InstagramIcon";
+import { STORE_LINKS } from "../data/links";
 
 // Componente do Rodapé do site com informações da marca, links de navegação, endereço físico e redes sociais
 export default function Footer() {
@@ -53,14 +54,18 @@ export default function Footer() {
           </p>
           <div className="flex gap-3 mt-4">
             <a
-              href="#"
+              href={STORE_LINKS.whatsapp}
+              target="_blank"
+              rel="noopener noreferrer"
               aria-label="WhatsApp"
               className="w-9 h-9 rounded-full bg-[#25D366]/90 flex items-center justify-center hover:opacity-90"
             >
               <MessageCircle size={16} className="text-white" />
             </a>
             <a
-              href="#"
+              href={STORE_LINKS.instagram}
+              target="_blank"
+              rel="noopener noreferrer"
               aria-label="Instagram"
               className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#e0399c] to-[#8b1538] flex items-center justify-center hover:opacity-90"
             >
@@ -76,4 +81,3 @@ export default function Footer() {
     </footer>
   );
 }
- 

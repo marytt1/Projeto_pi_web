@@ -5,19 +5,19 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-
 type CartDrawerProps = {
   items: CartItem[];
   onClose: () => void;
   onChangeQuantity: (id: string, delta: number) => void;
   onRemove: (id: string) => void;
   onCheckout?: () => void; // ex: navegar para /carrinho
+  onClear?: () => void; // esvazia o carrinho (botão "Cancelar")
 };
 
 // Componente do Painel flutuante do carrinho de compras que lista os itens, permite alterar quantidades e calcula o subtotal
-export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove, onCheckout }: CartDrawerProps) {
+export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove, onCheckout, onClear }: CartDrawerProps) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
+ 
   return (
     <div className="absolute right-0 top-full mt-2 w-[380px] bg-white rounded-2xl shadow-xl border border-neutral-100 z-50">
       <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
@@ -29,7 +29,7 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
           <X size={18} />
         </button>
       </div>
-
+ 
       <div className="max-h-72 overflow-y-auto divide-y divide-neutral-50">
         {items.length === 0 ? (
           <p className="text-sm text-neutral-400 text-center py-8">Seu carrinho está vazio.</p>
@@ -43,7 +43,7 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
                   {item.size} · {item.colorName}
                 </p>
                 <p className="text-sm font-semibold text-[#8b1538] mt-0.5">{formatPrice(item.price)}</p>
-
+ 
                 <div className="flex items-center gap-2 mt-2">
                   <button
                     onClick={() => onChangeQuantity(item.id, -1)}
@@ -73,7 +73,7 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
           ))
         )}
       </div>
-
+ 
       <div className="px-6 py-4 border-t border-neutral-100">
         <div className="flex items-center justify-between text-sm mb-4">
           <span className="text-neutral-500">Subtotal</span>
@@ -87,7 +87,10 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
             Finalizar
           </button>
           <button
-            onClick={onClose}
+            onClick={() => {
+              onClear?.();
+              onClose();
+            }}
             className="flex-1 border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0] transition-colors text-sm font-medium py-2.5 rounded-full"
           >
             Cancelar

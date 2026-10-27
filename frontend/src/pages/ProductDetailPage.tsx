@@ -45,10 +45,11 @@ function ProductDetail({ product }: ProductDetailProps) {
   const favorite = isFavorite(product.id);
 
   function handleAddToCart() {
-    addToCart(product, selectedSize, selectedColor);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  }
+  if (!addToCart(product, selectedSize, selectedColor)) return;
+
+  setAdded(true);
+  setTimeout(() => setAdded(false), 1500);
+}
 
   return (
     <main className="px-6 md:px-10 py-8 max-w-6xl mx-auto">

@@ -1,3 +1,4 @@
+import { useState, useRef } from "react";
 import { Play } from "lucide-react";
 import type { VideoItem } from "../types/video";
 
@@ -5,54 +6,45 @@ type VideoCardProps = {
   video: VideoItem;
 };
 
-function formatPrice(value: number) {
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-// Componente do Card no formato vertical estilo Reels com reprodução de vídeo, legenda e atalho rápido para visualização do produto
+// Componente do Card no formato vertical estilo Reels com reprodução de vídeo
 export default function VideoCard({ video }: VideoCardProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
   return (
-    <article className="relative shrink-0 w-[220px] md:w-[240px] aspect-[9/16] rounded-2xl overflow-hidden snap-start group cursor-pointer">
-      <img
-        src={video.thumb}
-        alt={video.productName}
+    <article
+      onClick={togglePlay}
+      className="relative shrink-0 w-[220px] md:w-[240px] aspect-[9/16] rounded-2xl overflow-hidden group cursor-pointer select-none"
+    >
+      <video
+        ref={videoRef}
+        src={video.videoUrl}
+        poster={video.thumb}
+        loop
+        playsInline
+        onEnded={() => setIsPlaying(false)}
         className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-black/20" />
-
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="w-11 h-11 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/40 transition-colors">
-          <Play size={18} className="text-white fill-white ml-0.5" />
-        </span>
-      </div>
-
-       <p className="absolute bottom-[76px] left-3 right-3 text-white text-xs font-medium drop-shadow">
-        {video.caption}
-      </p>
-
-      <div className="absolute bottom-0 inset-x-0 bg-white/95 backdrop-blur-sm px-2.5 py-2 flex items-center gap-2">
-        <img
-          src={video.productImage}
-          alt=""
-          className="w-9 h-9 rounded-lg object-cover shrink-0"
-        />
-        <div className="min-w-0">
-          <p className="text-[11px] text-[#3a3a3a] leading-tight truncate">
-            {video.productName}
-          </p>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xs font-semibold text-[#8b1538]">
-              {formatPrice(video.price)}
-            </span>
-            {video.oldPrice && (
-              <span className="text-[10px] text-neutral-400 line-through">
-                {formatPrice(video.oldPrice)}
-              </span>
-            )}
-          </div>
+      {!isPlaying && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+          <span className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/50 transition-colors">
+            <Play size={20} className="text-white fill-white ml-0.5" />
+          </span>
         </div>
-      </div>
+      )}
     </article>
   );
 }

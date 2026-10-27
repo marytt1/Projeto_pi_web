@@ -14,17 +14,17 @@ export default function AdminOverview() {
   const salesToday = ORDERS.reduce((sum, order) => sum + order.total, 0);
   const pendingOrders = ORDERS.filter((order) => order.status === "Aguardando").length;
   const stockAlerts = 4;
-
+ 
   const [search, setSearch] = useState("");
-
+ 
   const recentOrders = ORDERS.slice(0, 5).filter((order) =>
-    matchesSearch(search, order.id, order.customerName, order.customerPhone, order.items, order.status)
+    matchesSearch(search, order.id, order.customerName, order.items, order.status)
   );
-
+ 
   return (
     <div>
       <AdminTopBar title="Visão Geral" />
-
+ 
       <div className="grid sm:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="flex items-center justify-between mb-3">
@@ -36,7 +36,7 @@ export default function AdminOverview() {
           <p className="text-2xl font-semibold">{formatPrice(salesToday)}</p>
           <p className="text-xs text-neutral-400 mt-1">{ORDERS.length} pedidos realizados</p>
         </div>
-
+ 
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-neutral-500">Pedidos Pendentes</span>
@@ -47,7 +47,7 @@ export default function AdminOverview() {
           <p className="text-2xl font-semibold">{pendingOrders}</p>
           <p className="text-xs text-neutral-400 mt-1">aguardando confirmação de pagamento</p>
         </div>
-
+ 
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-neutral-500">Alertas de Estoque</span>
@@ -59,7 +59,7 @@ export default function AdminOverview() {
           <p className="text-xs text-neutral-400 mt-1">variações com 3 ou menos unidades</p>
         </div>
       </div>
-
+ 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
           <h3 className="font-medium">Últimos Pedidos</h3>
@@ -74,7 +74,7 @@ export default function AdminOverview() {
             />
           </div>
         </div>
-
+ 
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-400 text-xs border-b border-neutral-100">
@@ -92,7 +92,6 @@ export default function AdminOverview() {
                 <td className="px-6 py-4 text-neutral-400">{order.id}</td>
                 <td className="px-6 py-4">
                   <p className="font-medium">{order.customerName}</p>
-                  <p className="text-xs text-neutral-400">{order.customerPhone}</p>
                 </td>
                 <td className="px-6 py-4">{order.items}</td>
                 <td className="px-6 py-4 font-medium">{formatPrice(order.total)}</td>

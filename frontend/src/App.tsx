@@ -8,9 +8,10 @@ import CatalogPage from "./pages/CatalogPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import CartPage from "./pages/CartPage";
 import LoginPage from "./pages/LoginPage";
-import CadastroPage from "./pages/SignUpPage";
+import SignUpPage from "./pages/SignUpPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import AccountPage from "./pages/AccountPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import RequireAuth from "./components/RequireAuth";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminSales from "./pages/admin/AdminSales";
@@ -26,7 +27,8 @@ export default function App() {
         <Route path="produto/:id" element={<ProductDetailPage />} /> {/* "/produto/cropped-grazy" (rota dinâmica) */}
         <Route path="carrinho" element={<CartPage />} />             {/* "/carrinho" */}
         <Route path="login" element={<LoginPage />} />               {/* "/login" */}
-        <Route path="cadastro" element={<CadastroPage />} />         {/* "/cadastro" */}
+        <Route path="cadastro" element={<SignUpPage />} />         {/* "/cadastro" */}
+        <Route path="redefinir-senha" element={<ResetPasswordPage />} /> {/* "/redefinir-senha?token=..." */}
         {/* "/conta": só para quem está logado (visitante vai para /login) */}
         <Route
           path="conta"
@@ -38,7 +40,8 @@ export default function App() {
         />
         <Route path="*" element={<NotFoundPage />} />                {/* qualquer endereço que não existe */}
       </Route>
-
+ 
+      {/* Painel administrativo: tem layout próprio (menu lateral) */}
       <Route
         path="admin"
         element={

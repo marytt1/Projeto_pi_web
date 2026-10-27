@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { X, Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router";
+import { X } from "lucide-react";
 import { useAuth } from "./AuthContext";
+import PasswordField from "./PasswordField";
 
 type AuthView = "entrar" | "cadastrar" | "recuperar";
 
@@ -16,59 +18,25 @@ const INPUT_CLASS =
 const PRIMARY_BUTTON_CLASS =
   "w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full";
 
-// Campo de senha com o botão de mostrar/esconder (usado no login e no cadastro)
-type PasswordFieldProps = {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-};
-
-function PasswordField({ value, onChange, placeholder }: PasswordFieldProps) {
-  const [show, setShow] = useState(false);
-
-  return (
-    <div className="relative">
-      <input
-        type={show ? "text" : "password"}
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`${INPUT_CLASS} pr-10`}
-      />
-      <button
-        type="button"
-        onClick={() => setShow((prev) => !prev)}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400"
-        aria-label="Mostrar senha"
-      >
-        {show ? <Eye size={16} /> : <EyeOff size={16} />}
-      </button>
-    </div>
-  );
-}
-
-// Componente do Modal de Autenticação alternando entre as abas de login e cadastro
+// Telas dentro do modal para entrar, cadastrar ou recuperar a conta
 export default function AuthModal({ initialMode = "entrar", message, onClose }: AuthModalProps) {
   const { login, register, requestPasswordReset } = useAuth();
+  const navigate = useNavigate();
 
   const [view, setView] = useState<AuthView>(initialMode);
 
-  // Campos do formulário e mensagens
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  // Troca de tela limpando mensagens antigas
   function changeView(next: AuthView) {
     setView(next);
     setError("");
-    setSuccess("");
   }
 
   function handleLogin(event: FormEvent) {
-    event.preventDefault();
+    event.preventDefault(); 
     const result = login(email, password);
     if (result.ok) onClose?.();
     else setError(result.message);
@@ -81,14 +49,15 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
     else setError(result.message);
   }
 
+  // "Enviar link de recuperação": pede o link e, se deu certo, fecha o modal e abre a página /redefinir-senha
   function handleRecover(event: FormEvent) {
     event.preventDefault();
     const result = requestPasswordReset(email);
-    if (result.ok) {
-      setError("");
-      setSuccess(result.message);
+
+    if (result.ok && result.token) {
+      onClose?.();
+      navigate(`/redefinir-senha?token=${result.token}`);
     } else {
-      setSuccess("");
       setError(result.message);
     }
   }
@@ -97,7 +66,6 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
     view === "entrar" ? "Acesse sua conta" : view === "cadastrar" ? "Crie sua conta" : "Recuperar senha";
 
   return (
-    // Fundo escurecido: clicar fora fecha o modal
     <div
       className="fixed inset-0 bg-black/10 backdrop-blur-[1px] flex items-start justify-center pt-24 px-4 z-[60]"
       onClick={onClose}
@@ -152,7 +120,6 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
             />
             <PasswordField value={password} onChange={setPassword} placeholder="Senha" />
 
-            {/* Abre a tela de recuperação de senha */}
             <button
               type="button"
               onClick={() => changeView("recuperar")}
@@ -213,11 +180,6 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
             />
 
             {error && <p className="text-xs text-red-600 text-center">{error}</p>}
-            {success && (
-              <p className="text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2 text-center">
-                {success}
-              </p>
-            )}
 
             <button type="submit" className={PRIMARY_BUTTON_CLASS}>
               Enviar link de recuperação

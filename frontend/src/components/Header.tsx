@@ -8,7 +8,7 @@ import { useAuth } from "./AuthContext";
 import CartDrawer from "./CartDrawer";
 import FavoritesDrawer from "./FavoritesDrawer";
 import AccountMenu from "./AccountMenu";
-import SearchBar from "./Searchbar";
+import SearchBar from "./SearchBar";
 
 type HeaderProps = {
   navLinks?: NavLinkType[];
@@ -28,7 +28,7 @@ export default function Header({
   // Estado: menu lateral (drawer) aberto ou fechado
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const { cart, favorites, changeQuantity, removeFromCart, removeFavorite } = useShop();
+  const { cart, favorites, changeQuantity, removeFromCart, clearCart, removeFavorite } = useShop();
 
   const [openPopover, setOpenPopover] = useState<OpenPopover>(null);
 
@@ -184,6 +184,7 @@ export default function Header({
                 onClose={() => setOpenPopover(null)}
                 onChangeQuantity={changeQuantity}
                 onRemove={removeFromCart}
+                onClear={clearCart}
                 // "Finalizar" leva pra rota /carrinho e fecha o popover
                 onCheckout={() => {
                   setOpenPopover(null);
