@@ -2,8 +2,9 @@ import { useState } from "react";
 import { TrendingUp, Package, AlertTriangle, Search } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
-import { ORDERS } from "../../data/orders";
+import { useOrders } from "../../components/OrdersContext";
 import { matchesSearch } from "../../components/Search";
+import { formatDate, sortNewestFirst, summarizeItems } from "../../components/Orders";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -11,20 +12,26 @@ function formatPrice(value: number) {
 
 // Página que exibe o painel principal com métricas resumidas (vendas, pendências, alertas) e os últimos pedidos realizados
 export default function AdminOverview() {
-  const salesToday = ORDERS.reduce((sum, order) => sum + order.total, 0);
-  const pendingOrders = ORDERS.filter((order) => order.status === "Aguardando").length;
-  const stockAlerts = 4;
- 
+ const { orders, stock } = useOrders();
   const [search, setSearch] = useState("");
- 
-  const recentOrders = ORDERS.slice(0, 5).filter((order) =>
-    matchesSearch(search, order.id, order.customerName, order.items, order.status)
-  );
- 
+
+  const today = formatDate(new Date());
+
+  const confirmedToday = orders.filter((o) => o.date === today && o.status !== "Aguardando");
+  const salesToday = confirmedToday.reduce((sum, o) => sum + o.total, 0);
+
+  const pendingOrders = orders.filter((o) => o.status === "Aguardando").length;
+
+  const stockAlerts = stock.filter((row) => row.stock <= 3).length;
+
+  const recentOrders = sortNewestFirst(orders)
+    .slice(0, 5)
+    .filter((o) => matchesSearch(search, o.id, o.customerName, o.customerEmail, summarizeItems(o.items), o.status));
+
   return (
     <div>
       <AdminTopBar title="Visão Geral" />
- 
+
       <div className="grid sm:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="flex items-center justify-between mb-3">
@@ -34,9 +41,11 @@ export default function AdminOverview() {
             </span>
           </div>
           <p className="text-2xl font-semibold">{formatPrice(salesToday)}</p>
-          <p className="text-xs text-neutral-400 mt-1">{ORDERS.length} pedidos realizados</p>
+          <p className="text-xs text-neutral-400 mt-1">
+            {confirmedToday.length} pedido{confirmedToday.length !== 1 && "s"} com pagamento confirmado
+          </p>
         </div>
- 
+
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-neutral-500">Pedidos Pendentes</span>
@@ -47,7 +56,7 @@ export default function AdminOverview() {
           <p className="text-2xl font-semibold">{pendingOrders}</p>
           <p className="text-xs text-neutral-400 mt-1">aguardando confirmação de pagamento</p>
         </div>
- 
+
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm text-neutral-500">Alertas de Estoque</span>
@@ -59,7 +68,7 @@ export default function AdminOverview() {
           <p className="text-xs text-neutral-400 mt-1">variações com 3 ou menos unidades</p>
         </div>
       </div>
- 
+
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
           <h3 className="font-medium">Últimos Pedidos</h3>
@@ -74,7 +83,7 @@ export default function AdminOverview() {
             />
           </div>
         </div>
- 
+
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-neutral-400 text-xs border-b border-neutral-100">
@@ -92,8 +101,9 @@ export default function AdminOverview() {
                 <td className="px-6 py-4 text-neutral-400">{order.id}</td>
                 <td className="px-6 py-4">
                   <p className="font-medium">{order.customerName}</p>
+                  <p className="text-xs text-neutral-400">{order.customerEmail}</p>
                 </td>
-                <td className="px-6 py-4">{order.items}</td>
+                <td className="px-6 py-4 max-w-[220px]">{summarizeItems(order.items)}</td>
                 <td className="px-6 py-4 font-medium">{formatPrice(order.total)}</td>
                 <td className="px-6 py-4 text-neutral-500">{order.date}</td>
                 <td className="px-6 py-4">
@@ -103,6 +113,10 @@ export default function AdminOverview() {
             ))}
           </tbody>
         </table>
+
+        {recentOrders.length === 0 && (
+          <p className="text-sm text-neutral-400 text-center py-8">Nenhum pedido encontrado.</p>
+        )}
       </div>
     </div>
   );

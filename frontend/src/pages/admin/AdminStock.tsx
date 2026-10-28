@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
-import { STOCK } from "../../data/stock";
+import { useOrders } from "../../components/OrdersContext";
 import type { StockItem, StockCategory } from "../../types/stock";
 import { matchesSearch } from "../../components/Search";
 
@@ -9,6 +9,7 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Rascunho da linha "Novo Produto"
 type NewItemDraft = {
   sku: string;
   product: string;
@@ -32,12 +33,15 @@ const CELL_INPUT_CLASS =
 
 // Página de estoque que gerencia o inventário com busca de produtos, remoção e edição inline da quantidade em estoque
 export default function AdminStock() {
-  const [stock, setStock] = useState<StockItem[]>(STOCK);
+  // Estoque global: o mesmo que é baixado quando um pagamento é confirmado em Vendas
+  const { stock, addStockItem, setStockQuantity, removeStockItem } = useOrders();
   const [search, setSearch] = useState("");
 
+  // Edição do estoque de uma linha existente 
   const [editingSku, setEditingSku] = useState<string | null>(null);
   const [draftValue, setDraftValue] = useState("");
 
+  // Linha nova
   const [newItem, setNewItem] = useState<NewItemDraft | null>(null);
   const [newItemError, setNewItemError] = useState("");
 
@@ -56,14 +60,15 @@ export default function AdminStock() {
     const newStock = Number(draftValue);
     if (Number.isNaN(newStock) || newStock < 0) return;
 
-    setStock((prev) => prev.map((item) => (item.sku === sku ? { ...item, stock: newStock } : item)));
+    setStockQuantity(sku, newStock);
     cancelEditing();
   }
 
   function removeItem(sku: string) {
-    setStock((prev) => prev.filter((item) => item.sku !== sku));
+    removeStockItem(sku);
   }
 
+  // Clicar em "Novo Produto" abre uma linha em branco no topo da tabela
   function startNewItem() {
     cancelEditing();
     setNewItem({ ...EMPTY_DRAFT });
@@ -75,6 +80,7 @@ export default function AdminStock() {
     setNewItemError("");
   }
 
+  // Atualiza um campo do rascunho, mantendo os outros
   function updateDraft<K extends keyof NewItemDraft>(field: K, value: NewItemDraft[K]) {
     setNewItem((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
@@ -87,6 +93,7 @@ export default function AdminStock() {
     const price = Number(newItem.price.replace(",", "."));
     const quantity = Number(newItem.stock);
 
+    // Validações
     if (!sku || !product) {
       setNewItemError("Preencha o SKU e o nome do produto.");
       return;
@@ -112,7 +119,7 @@ export default function AdminStock() {
       price,
       stock: quantity,
     };
-    setStock((prev) => [created, ...prev]);
+    addStockItem(created);
     cancelNewItem();
   }
 
@@ -195,6 +202,7 @@ export default function AdminStock() {
                       onChange={(e) => updateDraft("category", e.target.value as StockCategory)}
                       className={CELL_INPUT_CLASS}
                     >
+                      <option value="Lingerie">Lingerie</option>
                       <option value="Fitness">Fitness</option>
                     </select>
                   </td>

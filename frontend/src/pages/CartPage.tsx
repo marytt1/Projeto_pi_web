@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Minus, Plus, Trash2, MessageCircle } from "lucide-react";
+import { Link } from "react-router";
+import { Minus, Plus, Trash2, MessageCircle, Check } from "lucide-react";
 import { useShop } from "../components/ShopContext";
 import { useAuth } from "../components/AuthContext";
 import { buildWhatsAppLink } from "../data/links";
+import { useOrders } from "../components/OrdersContext";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -10,10 +12,13 @@ function formatPrice(value: number) {
 
 // Página de carrinho de compras que permite gerenciar os itens, preencher os dados de identificação e enviar o pedido diretamente via WhatsApp
 export default function CartPage() {
-  const { cart, changeQuantity, removeFromCart } = useShop();
+  const { cart, changeQuantity, removeFromCart, clearCart } = useShop();
+  const { placeOrder } = useOrders();
 
-  const { user } = useAuth();
+  const { user, requireLogin } = useAuth();
   const [form, setForm] = useState({ name: user?.name ?? "", email: user?.email ?? "" });
+
+  const [sentOrder, setSentOrder] = useState<{ id: string; whatsappLink: string } | null>(null);
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -24,6 +29,10 @@ export default function CartPage() {
   const canSubmit = form.name.trim() !== "" && cart.length > 0;
 
   function handleSendOrder() {
+    if (!requireLogin("Faça login para enviar o pedido.") || !user) return;
+
+    const order = placeOrder(cart, form.name.trim(), user.email);
+
     const itemsText = cart
       .map(
         (item) =>
@@ -32,7 +41,7 @@ export default function CartPage() {
       .join("\n");
 
     const lines = [
-      "Olá! Gostaria de fazer o seguinte pedido:",
+      `Olá! Gostaria de confirmar o pedido ${order.id}:`,
       "",
       itemsText,
       "",
@@ -42,14 +51,50 @@ export default function CartPage() {
     ];
     if (form.email.trim()) lines.push(`Email: ${form.email.trim()}`);
 
-    window.open(buildWhatsAppLink(lines.join("\n")), "_blank");
+    const whatsappLink = buildWhatsAppLink(lines.join("\n"));
+    window.open(whatsappLink, "_blank");
+    clearCart();
+    setSentOrder({ id: order.id, whatsappLink });
+  }
+
+  if (sentOrder) {
+    return (
+      <main className="px-6 md:px-10 py-16">
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow p-8 text-center">
+          <span className="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <Check size={28} />
+          </span>
+          <h1 className="font-serif text-2xl text-[#8b1538]">Pedido registrado!</h1>
+          <p className="text-sm text-neutral-500 mt-3">
+            Enviamos o resumo para o WhatsApp da loja. Continue a conversa por lá para combinar o
+            pagamento. Assim que a loja confirmar, o seu pedido segue para a separação.
+          </p>
+
+          <a
+            href={sentOrder.whatsappLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block mt-5 text-xs text-[#8b1538] underline"
+          >
+            O WhatsApp não abriu? Clique aqui
+          </a>
+
+          <Link
+            to="/catalogo"
+            className="block mt-6 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full"
+          >
+            Continuar comprando
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (
     <>
       <main className="px-6 md:px-10 py-10">
         <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-          <div className="bg-white rounded-2xl shadow p-6">
+         <div className="bg-white rounded-2xl shadow p-6">
             <h2 className="font-medium text-lg mb-4">Itens</h2>
 
             {cart.length === 0 ? (

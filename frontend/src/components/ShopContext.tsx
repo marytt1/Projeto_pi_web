@@ -9,11 +9,10 @@ import { useAuth } from "./AuthContext";
 type ShopContextType = {
   cart: CartItem[];
   favorites: FavoriteItem[];
-  
   addToCart: (product: Product, size?: string, color?: string) => boolean;
   changeQuantity: (id: string, delta: number) => void;
   removeFromCart: (id: string) => void;
-  clearCart: () => void;
+  clearCart: () => void; // esvazia o carrinho inteiro
   toggleFavorite: (product: Product, size?: string, color?: string) => boolean;
   isFavorite: (productId: string) => boolean;
   removeFavorite: (id: string) => void;
@@ -28,6 +27,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
 
+  // Quando entra ou sai alguém, limpa o carrinho e os favoritos
   const [lastUserEmail, setLastUserEmail] = useState(user?.email ?? null);
   if ((user?.email ?? null) !== lastUserEmail) {
     setLastUserEmail(user?.email ?? null);
@@ -38,6 +38,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   function addToCart(product: Product, size = product.sizes[0], color = product.colors[0]) {
     if (!requireLogin("Faça login para adicionar peças ao carrinho.")) return false;
 
+    // id composto: a mesma peça em tamanhos/cores diferentes vira itens diferentes
     const id = `${product.id}-${size}-${color}`;
 
     setCart((prev) => {
@@ -51,6 +52,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
       const newItem: CartItem = {
         id,
+        productId: product.id,
         name: product.name,
         image: product.image,
         size,
@@ -76,6 +78,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     setCart((prev) => prev.filter((item) => item.id !== id));
   }
 
+  // Remove todos os itens do carrinho 
   function clearCart() {
     setCart([]);
   }

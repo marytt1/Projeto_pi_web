@@ -1,12 +1,41 @@
+import { PRODUCTS } from "./products";
+import { getColorName, getColorCode } from "./colors";
 import type { StockItem } from "../types/stock";
 
-// Simulação dos dados de estoque exibido no Dashboard Administrativo (Estoque)
-export const STOCK: StockItem[] = [
-  { sku: "P01-BRD-M", product: "Macaquinho Paola", variation: "Borgonha / M", category: "Fitness", price: 219.9, stock: 3 },
-  { sku: "P01-PRT-G", product: "Shorts Pietra", variation: "Preto / G", category: "Fitness", price: 129.9, stock: 0 },
-  { sku: "P02-BRD-P", product: "Cropped Grazy", variation: "Borgonha / P", category: "Fitness", price: 99.9, stock: 3 },
-  { sku: "P03-CRM-G", product: "Top Alice", variation: "Pink / G", category: "Fitness", price: 189.9, stock: 8 },
-  { sku: "P04-PRT-M", product: "Macaquinho Karol", variation: "Preto / M", category: "Fitness", price: 159.9, stock: 0 },
-  { sku: "P05-RSE-38", product: "Top Camila", variation: "Pink / 38", category: "Fitness", price: 149.9, stock: 12 },
-  { sku: "P06-BRD-M", product: "Top Jessica Manga Curta", variation: "Preto / M", category: "Fitness", price: 99.9, stock: 6 },
-];
+// Simulação do estoque que é gerado a partir dos produtos da loja: uma linha para cada combinação de produto + cor + tamanho
+function buildStock(): StockItem[] {
+  const rows: StockItem[] = [];
+  let counter = 0;
+
+  PRODUCTS.forEach((product, productIndex) => {
+    const productCode = `P${String(productIndex + 1).padStart(2, "0")}`; // P01, P02...
+
+    product.colors.forEach((color) => {
+      product.sizes.forEach((size) => {
+        // Quantidades de exemplo variadas, com algumas baixas e produtos marcados como esgotados na vitrine começam com 0
+        const quantity = product.soldOut
+          ? 0
+          : counter % 17 === 5
+          ? 0
+          : counter % 13 === 4
+          ? 2
+          : 4 + ((counter * 7) % 9);
+
+        rows.push({
+          sku: `${productCode}-${getColorCode(color)}-${size}`,
+          productId: product.id,
+          product: product.name,
+          variation: `${getColorName(color)} / ${size}`,
+          category: "Fitness",
+          price: product.price,
+          stock: quantity,
+        });
+        counter++;
+      });
+    });
+  });
+
+  return rows;
+}
+
+export const STOCK: StockItem[] = buildStock();

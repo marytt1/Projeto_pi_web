@@ -93,8 +93,7 @@ export default function Header({
       
       <div className="hidden md:flex items-center justify-center gap-8 bg-[#5c0f1c] text-white text-xs py-2 px-4">
         <span>BRL (R$) / PT-BR</span>
-        <span>Troca gratuita em até 30 dias</span>
-        <span>Frete grátis a partir de R$600,00</span>
+        <span>Troca gratuita em até 7 dias</span>
         <span>Descubra seu tamanho ideal La Rose</span>
         <span>Atendimento Presencial em Santa Cruz das Palmeiras - SP</span>
       </div>
