@@ -1,151 +1,132 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
 import type { ReactNode } from "react";
-import type { Order, OrderItem, OrderStatus } from "../types/order";
-import type { CartItem } from "../types/cart";
+import type { Order } from "../types/order";
 import type { StockItem } from "../types/stock";
-import { ORDERS } from "../data/orders";
-import { STOCK } from "../data/stock";
-import { calculateTotal, formatDate, nextOrderId } from "../components/Orders";
+import { admin as adminApi, ApiError } from "../services/api";
+import type { Dashboard } from "../services/adapters";
+import { useAdminData } from "../hooks/useAdminData";
+import type { ActionResult } from "../hooks/useShopData";
 import { normalizeText } from "../components/Search";
-
-// Estado global de pedidos e estoque
-const ORDERS_KEY = "larose_orders_v1";
-const STOCK_KEY = "larose_stock_v1";
-
-// Próximo status de cada pedido (Entregue é o fim do fluxo)
-const NEXT_STATUS: Record<OrderStatus, OrderStatus | null> = {
-  Aguardando: "Confirmado",
-  Confirmado: "Enviado",
-  Enviado: "Entregue",
-  Entregue: null,
-};
+import { useAuth } from "./AuthContext";
+import { useShop } from "./ShopContext";
 
 type OrdersContextType = {
   orders: Order[];
   stock: StockItem[];
-  placeOrder: (items: CartItem[], customerName: string, customerEmail: string) => Order;
-  advanceOrder: (orderId: string) => void;
-  addStockItem: (item: StockItem) => void;
-  setStockQuantity: (sku: string, quantity: number) => void;
-  removeStockItem: (sku: string) => void;
+  dashboard: Dashboard | null;
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+  placeOrder: () => Promise<ActionResult>;
+  // Aguardando -> Confirmado (baixa o estoque) -> Enviado -> Entregue
+  advanceOrder: (orderId: string) => Promise<ActionResult>;
+  addStockItem: (item: StockItem) => Promise<ActionResult>;
+  setStockQuantity: (sku: string, quantity: number) => Promise<ActionResult>;
+  removeStockItem: (sku: string) => Promise<ActionResult>;
 };
 
 const OrdersContext = createContext<OrdersContextType | null>(null);
 
-function load<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function save(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // sem espaço ou bloqueado: o site continua funcionando, só não salva
-  }
-}
-
-// Desconta do estoque as peças de um pedido
-function deductStock(stock: StockItem[], items: OrderItem[]): StockItem[] {
-  return stock.map((row) => {
-    const bought = items.find(
-      (item) =>
-        (row.productId === item.productId || normalizeText(row.product) === normalizeText(item.name)) &&
-        normalizeText(row.variation) === normalizeText(`${item.colorName} / ${item.size}`)
-    );
-    return bought ? { ...row, stock: Math.max(0, row.stock - bought.quantity) } : row;
-  });
-}
+const errorMessage = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado. Tente novamente.");
 
 export function OrdersProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrders] = useState<Order[]>(() => load(ORDERS_KEY, ORDERS));
-  const [stock, setStock] = useState<StockItem[]>(() => load(STOCK_KEY, STOCK));
+  const { isAdmin, requireLogin } = useAuth();
+  const { products, reloadProducts, checkout } = useShop();
+  const admin = useAdminData(isAdmin);
 
-  // Mantém duas abas do navegador sincronizadas
-  useEffect(() => {
-    function handleStorage(event: StorageEvent) {
-      if (!event.newValue) return;
-      if (event.key === ORDERS_KEY) setOrders(JSON.parse(event.newValue) as Order[]);
-      if (event.key === STOCK_KEY) setStock(JSON.parse(event.newValue) as StockItem[]);
+  // O estoque mudou: atualiza também o catálogo da loja
+  async function refreshAfterStockChange() {
+    await Promise.all([admin.reloadAll(), reloadProducts()]);
+  }
+
+  async function placeOrder(): Promise<ActionResult> {
+    const message = "Faça login para finalizar o pedido.";
+    if (!requireLogin(message)) return { ok: false, needsLogin: true, message };
+    return checkout();
+  }
+
+  async function advanceOrder(orderId: string): Promise<ActionResult> {
+    const order = admin.orders.find((o) => o.id === orderId);
+    if (!order) return { ok: false, message: "Pedido não encontrado." };
+
+    let result: ActionResult;
+    if (order.status === "Aguardando") result = await admin.confirmPayment(order); // confirma o pagamento e baixa o estoque
+    else if (order.status === "Confirmado") result = await admin.advanceStatus(order, "Enviado");
+    else if (order.status === "Enviado") result = await admin.advanceStatus(order, "Entregue");
+    else return { ok: false, message: "Este pedido não pode avançar." };
+
+    if (result.ok) await reloadProducts();
+    return result;
+  }
+
+  // Cadastra uma variação nova. Se o produto ainda não existe, cria o produto antes.
+  async function addStockItem(item: StockItem): Promise<ActionResult> {
+    const [color, size] = item.variation.split("/").map((part) => part.trim());
+    if (!color || !size) return { ok: false, message: 'Informe a variação no formato "Cor / Tamanho".' };
+
+    try {
+      let productId = item.productId ? Number(item.productId) : NaN;
+
+      if (!Number.isInteger(productId)) {
+        const existing = products.find((p) => normalizeText(p.name) === normalizeText(item.product));
+        productId = existing ? Number(existing.id) : NaN;
+      }
+
+      if (!Number.isInteger(productId)) {
+        const created = (await adminApi.createProduct({
+          name: item.product,
+          price: item.price,
+          category: item.category,
+          stock: 0,
+        })) as { product: { id: number } };
+        productId = created.product.id;
+      }
+
+      await adminApi.createVariant({ sku: item.sku, size, color, stock: item.stock, ProductId: productId });
+      await refreshAfterStockChange();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: errorMessage(e) };
     }
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
-
-  function updateOrders(next: Order[]) {
-    setOrders(next);
-    save(ORDERS_KEY, next);
   }
 
-  function updateStock(next: StockItem[]) {
-    setStock(next);
-    save(STOCK_KEY, next);
+  async function setStockQuantity(sku: string, quantity: number): Promise<ActionResult> {
+    const row = admin.stock.find((r) => r.sku === sku);
+    if (!row) return { ok: false, message: "Item de estoque não encontrado." };
+
+    const result = await admin.updateStock(row, quantity);
+    if (result.ok) await reloadProducts();
+    return result;
   }
 
-  // Cria um pedido "Aguardando" a partir dos itens do carrinho
-  function placeOrder(items: CartItem[], customerName: string, customerEmail: string): Order {
-    const orderItems: OrderItem[] = items.map((item) => ({
-      productId: item.productId,
-      name: item.name,
-      image: item.image,
-      size: item.size,
-      colorName: item.colorName,
-      quantity: item.quantity,
-      price: item.price,
-    }));
+  async function removeStockItem(sku: string): Promise<ActionResult> {
+    const row = admin.stock.find((r) => r.sku === sku);
+    if (!row || row.variantId === undefined) return { ok: false, message: "Item de estoque não encontrado." };
 
-    const order: Order = {
-      id: nextOrderId(orders),
-      customerName,
-      customerEmail,
-      items: orderItems,
-      total: calculateTotal(orderItems),
-      date: formatDate(new Date()),
-      status: "Aguardando",
-      stockDeducted: false,
-    };
-
-    updateOrders([order, ...orders]);
-    return order;
-  }
-
-  // Avança o pedido para a próxima etapa, baixando o estoque, uma única vez
-  function advanceOrder(orderId: string) {
-    const order = orders.find((o) => o.id === orderId);
-    if (!order) return;
-
-    const nextStatus = NEXT_STATUS[order.status];
-    if (!nextStatus) return;
-
-    const shouldDeduct = order.status === "Aguardando" && !order.stockDeducted;
-    if (shouldDeduct) updateStock(deductStock(stock, order.items));
-
-    updateOrders(
-      orders.map((o) =>
-        o.id === orderId ? { ...o, status: nextStatus, stockDeducted: o.stockDeducted || shouldDeduct } : o
-      )
-    );
-  }
-
-  function addStockItem(item: StockItem) {
-    updateStock([item, ...stock]);
-  }
-
-  function setStockQuantity(sku: string, quantity: number) {
-    updateStock(stock.map((row) => (row.sku === sku ? { ...row, stock: quantity } : row)));
-  }
-
-  function removeStockItem(sku: string) {
-    updateStock(stock.filter((row) => row.sku !== sku));
+    try {
+      await adminApi.deleteVariant(row.variantId);
+      await refreshAfterStockChange();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: errorMessage(e) };
+    }
   }
 
   return (
     <OrdersContext.Provider
-      value={{ orders, stock, placeOrder, advanceOrder, addStockItem, setStockQuantity, removeStockItem }}
+      value={{
+        orders: isAdmin ? admin.orders : [],
+        stock: isAdmin ? admin.stock : [],
+        dashboard: isAdmin ? admin.dashboard : null,
+        loading: admin.loading,
+        error: admin.error,
+        reload: admin.reloadAll,
+        placeOrder,
+        advanceOrder,
+        addStockItem,
+        setStockQuantity,
+        removeStockItem,
+      }}
     >
       {children}
     </OrdersContext.Provider>

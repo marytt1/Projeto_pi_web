@@ -24,10 +24,10 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route index element={<HomePage />} />                       {/* "/" */}
         <Route path="catalogo" element={<CatalogPage />} />          {/* "/catalogo" */}
-        <Route path="produto/:id" element={<ProductDetailPage />} /> {/* "/produto/cropped-grazy" (rota dinâmica) */}
+        <Route path="produto/:id" element={<ProductDetailPage />} /> {/* "/produto/3" (rota dinâmica: id do produto na API) */}
         <Route path="carrinho" element={<CartPage />} />             {/* "/carrinho" */}
         <Route path="login" element={<LoginPage />} />               {/* "/login" */}
-        <Route path="cadastro" element={<SignUpPage />} />         {/* "/cadastro" */}
+        <Route path="cadastro" element={<SignUpPage />} />           {/* "/cadastro" */}
         <Route path="redefinir-senha" element={<ResetPasswordPage />} /> {/* "/redefinir-senha?token=..." */}
         {/* "/conta": só para quem está logado (visitante vai para /login) */}
         <Route
@@ -40,7 +40,7 @@ export default function App() {
         />
         <Route path="*" element={<NotFoundPage />} />                {/* qualquer endereço que não existe */}
       </Route>
- 
+
       {/* Painel administrativo: tem layout próprio (menu lateral) */}
       <Route
         path="admin"
