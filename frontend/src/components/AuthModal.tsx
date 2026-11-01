@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router";
 import { X } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import PasswordField from "./PasswordField";
@@ -16,50 +15,58 @@ type AuthModalProps = {
 const INPUT_CLASS =
   "w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#8b1538]";
 const PRIMARY_BUTTON_CLASS =
-  "w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full";
+  "w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full disabled:opacity-60 disabled:cursor-not-allowed";
 
-// Telas dentro do modal para entrar, cadastrar ou recuperar a conta
+// entrar, cadastrar ou recuperar a conta
 export default function AuthModal({ initialMode = "entrar", message, onClose }: AuthModalProps) {
   const { login, register, requestPasswordReset } = useAuth();
-  const navigate = useNavigate();
-
   const [view, setView] = useState<AuthView>(initialMode);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState(""); 
+  const [loading, setLoading] = useState(false); 
 
   function changeView(next: AuthView) {
     setView(next);
     setError("");
+    setInfo("");
   }
 
-  function handleLogin(event: FormEvent) {
-    event.preventDefault(); 
-    const result = login(email, password);
+  async function handleLogin(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    setLoading(true);
+    const result = await login(email, password);
+    setLoading(false);
+
     if (result.ok) onClose?.();
     else setError(result.message);
   }
 
-  function handleRegister(event: FormEvent) {
+  async function handleRegister(event: FormEvent) {
     event.preventDefault();
-    const result = register(name, email, password);
+    setError("");
+    setLoading(true);
+    const result = await register(name, email, password);
+    setLoading(false);
+
     if (result.ok) onClose?.();
     else setError(result.message);
   }
 
-  // "Enviar link de recuperação": pede o link e, se deu certo, fecha o modal e abre a página /redefinir-senha
-  function handleRecover(event: FormEvent) {
+  async function handleRecover(event: FormEvent) {
     event.preventDefault();
-    const result = requestPasswordReset(email);
+    setError("");
+    setInfo("");
+    setLoading(true);
+    const result = await requestPasswordReset(email);
+    setLoading(false);
 
-    if (result.ok && result.token) {
-      onClose?.();
-      navigate(`/redefinir-senha?token=${result.token}`);
-    } else {
-      setError(result.message);
-    }
+    if (result.ok) setInfo(result.message);
+    else setError(result.message);
   }
 
   const subtitle =
@@ -130,8 +137,8 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
 
             {error && <p className="text-xs text-red-600 text-center">{error}</p>}
 
-            <button type="submit" className={PRIMARY_BUTTON_CLASS}>
-              Entrar
+            <button type="submit" disabled={loading} className={PRIMARY_BUTTON_CLASS}>
+              {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
         )}
@@ -152,7 +159,7 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
               onChange={(e) => setEmail(e.target.value)}
               className={INPUT_CLASS}
             />
-            <PasswordField value={password} onChange={setPassword} placeholder="Crie uma senha" />
+            <PasswordField value={password} onChange={setPassword} placeholder="Crie uma senha (mínimo 8 caracteres)" />
 
             <p className="text-xs text-neutral-400 -mt-2">
               Ao criar conta, você concorda com nossa política de privacidade.
@@ -160,13 +167,13 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
 
             {error && <p className="text-xs text-red-600 text-center">{error}</p>}
 
-            <button type="submit" className={PRIMARY_BUTTON_CLASS}>
-              Criar Conta Grátis
+            <button type="submit" disabled={loading} className={PRIMARY_BUTTON_CLASS}>
+              {loading ? "Criando conta..." : "Criar Conta Grátis"}
             </button>
           </form>
         )}
 
-        {view === "recuperar" && (
+        {view === "recuperar" && !info && (
           <form onSubmit={handleRecover} className="flex flex-col gap-4">
             <p className="text-xs text-neutral-500 text-center">
               Digite o email da sua conta e enviaremos um link para você criar uma nova senha.
@@ -181,8 +188,8 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
 
             {error && <p className="text-xs text-red-600 text-center">{error}</p>}
 
-            <button type="submit" className={PRIMARY_BUTTON_CLASS}>
-              Enviar link de recuperação
+            <button type="submit" disabled={loading} className={PRIMARY_BUTTON_CLASS}>
+              {loading ? "Enviando..." : "Enviar link de recuperação"}
             </button>
             <button
               type="button"
@@ -192,6 +199,22 @@ export default function AuthModal({ initialMode = "entrar", message, onClose }: 
               ← Voltar para o login
             </button>
           </form>
+        )}
+
+        {view === "recuperar" && info && (
+          <div className="flex flex-col gap-4 text-center">
+            <p className="text-sm text-emerald-700 bg-emerald-50 rounded-lg px-3 py-3">{info}</p>
+            <p className="text-xs text-neutral-500">
+              Abra o email e clique no link para criar a nova senha. O link vale por 30 minutos.
+            </p>
+            <button
+              type="button"
+              onClick={() => changeView("entrar")}
+              className="text-xs text-[#8b1538]"
+            >
+              ← Voltar para o login
+            </button>
+          </div>
         )}
       </div>
     </div>

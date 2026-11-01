@@ -1,12 +1,12 @@
-// Categoria do produto no estoque 
-export type StockCategory = "Fitness";
+export type StockCategory = string;
 
 // Uma linha da tabela de estoque: uma variação (cor/tamanho) de um produto
 export type StockItem = {
   sku: string;
-  productId?: string; 
+  variantId?: number; 
+  productId?: string;
   product: string;
-  variation: string; 
+  variation: string;
   category: StockCategory;
   price: number;
   stock: number;

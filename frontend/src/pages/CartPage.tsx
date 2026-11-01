@@ -10,51 +10,65 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-// Página de carrinho de compras que permite gerenciar os itens, preencher os dados de identificação e enviar o pedido diretamente via WhatsApp
+// Página de carrinho de compras que permite gerenciar os itens, conferir os dados da conta e enviar o pedido diretamente via WhatsApp
 export default function CartPage() {
-  const { cart, changeQuantity, removeFromCart, clearCart } = useShop();
+  const { cart, cartNotice, canCheckout, changeQuantity, removeFromCart } = useShop();
   const { placeOrder } = useOrders();
 
   const { user, requireLogin } = useAuth();
-  const [form, setForm] = useState({ name: user?.name ?? "", email: user?.email ?? "" });
 
   const [sentOrder, setSentOrder] = useState<{ id: string; whatsappLink: string } | null>(null);
-
-  function updateField(field: keyof typeof form, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
+  const [sending, setSending] = useState(false); // true enquanto o pedido é criado na API
+  const [error, setError] = useState("");
 
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const canSubmit = form.name.trim() !== "" && cart.length > 0;
+  // Só envia se há itens e todos têm estoque
+  const canSubmit = cart.length > 0 && canCheckout && !sending;
 
-  function handleSendOrder() {
+  async function handleSendOrder() {
     if (!requireLogin("Faça login para enviar o pedido.") || !user) return;
 
-    const order = placeOrder(cart, form.name.trim(), user.email);
+    setError("");
+    setSending(true);
 
-    const itemsText = cart
-      .map(
-        (item) =>
-          `- ${item.name} (${item.size} / ${item.colorName}) x${item.quantity} - ${formatPrice(item.price * item.quantity)}`
-      )
-      .join("\n");
+    // Cópia do carrinho: depois do pedido ele é esvaziado
+    const items = [...cart];
+    const total = subtotal;
 
-    const lines = [
-      `Olá! Gostaria de confirmar o pedido ${order.id}:`,
-      "",
-      itemsText,
-      "",
-      `Subtotal: ${formatPrice(subtotal)}`,
-      "",
-      `Nome: ${form.name.trim()}`,
-    ];
-    if (form.email.trim()) lines.push(`Email: ${form.email.trim()}`);
+    try {
+      // Cria o pedido (e todos os itens) na API e esvazia o carrinho
+      const result = await placeOrder();
 
-    const whatsappLink = buildWhatsAppLink(lines.join("\n"));
-    window.open(whatsappLink, "_blank");
-    clearCart();
-    setSentOrder({ id: order.id, whatsappLink });
+      if (!result.ok || !result.orderCode) {
+        setError(result.message ?? "Não foi possível criar o pedido. Tente novamente.");
+        return;
+      }
+
+      const itemsText = items
+        .map(
+          (item) =>
+            `- ${item.name} (${item.size} / ${item.colorName}) x${item.quantity} - ${formatPrice(item.price * item.quantity)}`
+        )
+        .join("\n");
+
+      const lines = [
+        `Olá! Gostaria de confirmar o pedido ${result.orderCode}:`,
+        "",
+        itemsText,
+        "",
+        `Subtotal: ${formatPrice(total)}`,
+        "",
+        `Nome: ${user.name}`,
+        `Email: ${user.email}`,
+      ];
+
+      const whatsappLink = result.whatsappUrl ?? buildWhatsAppLink(lines.join("\n"));
+      window.open(whatsappLink, "_blank");
+      setSentOrder({ id: result.orderCode, whatsappLink });
+    } finally {
+      setSending(false);
+    }
   }
 
   if (sentOrder) {
@@ -64,7 +78,7 @@ export default function CartPage() {
           <span className="mx-auto mb-4 w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
             <Check size={28} />
           </span>
-          <h1 className="font-serif text-2xl text-[#8b1538]">Pedido registrado!</h1>
+          <h1 className="font-serif text-2xl text-[#8b1538]">Pedido {sentOrder.id} registrado!</h1>
           <p className="text-sm text-neutral-500 mt-3">
             Enviamos o resumo para o WhatsApp da loja. Continue a conversa por lá para combinar o
             pagamento. Assim que a loja confirmar, o seu pedido segue para a separação.
@@ -115,6 +129,13 @@ export default function CartPage() {
                         {formatPrice(item.price)}
                       </p>
 
+                      {item.status === "out_of_stock" && (
+                        <p className="text-xs text-red-600 mt-1">Sem estoque. Remova este item para continuar.</p>
+                      )}
+                      {item.status === "quantity_adjusted" && (
+                        <p className="text-xs text-amber-600 mt-1">Só restam {item.available} em estoque.</p>
+                      )}
+
                       <div className="flex items-center gap-2 mt-2">
                         <button
                           onClick={() => changeQuantity(item.id, -1)}
@@ -126,7 +147,8 @@ export default function CartPage() {
                         <span className="text-sm w-5 text-center">{item.quantity}</span>
                         <button
                           onClick={() => changeQuantity(item.id, 1)}
-                          className="w-7 h-7 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50"
+                          disabled={item.available !== undefined && item.quantity >= item.available}
+                          className="w-7 h-7 rounded-full border border-neutral-200 flex items-center justify-center hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
                           aria-label="Aumentar quantidade"
                         >
                           <Plus size={13} />
@@ -145,6 +167,10 @@ export default function CartPage() {
               </div>
             )}
 
+            {cartNotice && (
+              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-3">{cartNotice}</p>
+            )}
+
             <div className="flex items-center justify-between border-t border-neutral-100 pt-4 mt-2">
               <span className="font-medium">Subtotal</span>
               <span className="font-semibold text-lg">{formatPrice(subtotal)}</span>
@@ -154,25 +180,27 @@ export default function CartPage() {
           <div className="bg-white rounded-2xl shadow p-6 h-fit">
             <h2 className="font-medium text-lg mb-1">Identificação</h2>
             <p className="text-sm text-neutral-400 mb-6">
-              Informe seu nome. O pedido será enviado para o WhatsApp da loja.
+              O pedido é feito em nome da sua conta e o resumo é enviado para o WhatsApp da loja.
             </p>
 
             <div className="flex flex-col gap-4">
               <input
                 type="text"
-                placeholder="Nome completo *"
-                value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#8b1538]"
+                placeholder="Nome completo"
+                value={user?.name ?? ""}
+                disabled
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none text-neutral-500"
               />
               <input
                 type="email"
-                placeholder="Email (opcional)"
-                value={form.email}
-                onChange={(e) => updateField("email", e.target.value)}
-                className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none focus:border-[#8b1538]"
+                placeholder="Email"
+                value={user?.email ?? ""}
+                disabled
+                className="w-full bg-neutral-50 border border-neutral-200 rounded-lg px-4 py-3 text-sm outline-none text-neutral-500"
               />
             </div>
+
+            {error && <p className="text-xs text-red-600 text-center mt-4">{error}</p>}
 
             <button
               onClick={handleSendOrder}
@@ -184,12 +212,14 @@ export default function CartPage() {
               }`}
             >
               <MessageCircle size={16} />
-              Enviar Pedido via WhatsApp
+              {sending ? "Enviando pedido..." : "Enviar Pedido via WhatsApp"}
             </button>
 
-            {!canSubmit && (
+            {!canSubmit && !sending && (
               <p className="text-xs text-neutral-400 text-center mt-3">
-                Preencha seu nome para continuar
+                {cart.length === 0
+                  ? "Adicione peças ao carrinho para continuar"
+                  : "Ajuste os itens sem estoque para continuar"}
               </p>
             )}
           </div>

@@ -1,18 +1,33 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect } from "react";
 import type { ReactNode } from "react";
 import type { Product } from "../types/product";
 import type { CartItem } from "../types/cart";
 import type { FavoriteItem } from "../types/favorite";
 import { getColorName } from "../data/colors";
+import { findVariant } from "../services/adapters";
+import { useShopData } from "../hooks/userShopData";
+import type { ActionResult } from "../hooks/useShopData";
 import { useAuth } from "./AuthContext";
 
 type ShopContextType = {
+  products: Product[];
+  loadingProducts: boolean;
+  productsError: string | null;
+  reloadProducts: () => Promise<void>;
+
+  // carrinho
   cart: CartItem[];
-  favorites: FavoriteItem[];
+  cartNotice: string | null;
+  canCheckout: boolean;
   addToCart: (product: Product, size?: string, color?: string) => boolean;
   changeQuantity: (id: string, delta: number) => void;
   removeFromCart: (id: string) => void;
   clearCart: () => void; // esvazia o carrinho inteiro
+  checkout: () => Promise<ActionResult>; 
+  reloadCart: () => Promise<void>;
+
+  // favoritos
+  favorites: FavoriteItem[];
   toggleFavorite: (product: Product, size?: string, color?: string) => boolean;
   isFavorite: (productId: string) => boolean;
   removeFavorite: (id: string) => void;
@@ -20,110 +35,83 @@ type ShopContextType = {
 
 const ShopContext = createContext<ShopContextType | null>(null);
 
-// Estado global do carrinho e dos favoritos
+// Nome da cor (ex.: "Preto") a partir do código hex que o card usa
+function colorNameFor(product: Product, colorHex: string) {
+  return product.colorOptions?.find((c) => c.hex === colorHex)?.name ?? getColorName(colorHex);
+}
+
 export function ShopProvider({ children }: { children: ReactNode }) {
   const { user, requireLogin } = useAuth();
+  const data = useShopData();
+  const { clearCart: emptyCart, reloadCart, reloadFavorites } = data;
 
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
+  const userId = user?.id ?? null;
 
-  // Quando entra ou sai alguém, limpa o carrinho e os favoritos
-  const [lastUserEmail, setLastUserEmail] = useState(user?.email ?? null);
-  if ((user?.email ?? null) !== lastUserEmail) {
-    setLastUserEmail(user?.email ?? null);
-    setCart([]);
-    setFavorites([]);
-  }
+  // Quando entra ou sai alguém: sem login o carrinho fica vazio; com login carrega o da pessoa.
+  // Os favoritos são recarregados nos dois casos.
+  useEffect(() => {
+    if (userId === null) emptyCart();
+    else reloadCart();
+    reloadFavorites();
+  }, [userId, emptyCart, reloadCart, reloadFavorites]);
 
+  // Devolve false se a pessoa não está logada ou se a combinação cor/tamanho não tem estoque
   function addToCart(product: Product, size = product.sizes[0], color = product.colors[0]) {
     if (!requireLogin("Faça login para adicionar peças ao carrinho.")) return false;
 
-    // id composto: a mesma peça em tamanhos/cores diferentes vira itens diferentes
-    const id = `${product.id}-${size}-${color}`;
+    const variant = findVariant(product, size, colorNameFor(product, color));
+    if (!variant || variant.stock <= 0) return false;
 
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === id);
-
-      if (existing) {
-        return prev.map((item) =>
-          item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-        );
-      }
-
-      const newItem: CartItem = {
-        id,
-        productId: product.id,
-        name: product.name,
-        image: product.image,
-        size,
-        colorName: getColorName(color),
-        price: product.price,
-        quantity: 1,
-      };
-      return [...prev, newItem];
-    });
-
+    // O id do item do carrinho é o id da variação: a mesma peça em outro tamanho/cor é outro item
+    void data.addToCart(product, size, variant.colorName);
     return true;
   }
 
   function changeQuantity(id: string, delta: number) {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
-      )
-    );
+    const item = data.cartItems.find((i) => i.id === id);
+    if (!item) return;
+    void data.setQuantity(id, Math.max(1, item.quantity + delta));
   }
 
   function removeFromCart(id: string) {
-    setCart((prev) => prev.filter((item) => item.id !== id));
+    void data.removeItem(id);
   }
 
-  // Remove todos os itens do carrinho 
+  // Remove todos os itens do carrinho
   function clearCart() {
-    setCart([]);
+    void emptyCart();
   }
 
-  function toggleFavorite(product: Product, size = product.sizes[0], color = product.colors[0]) {
+  function toggleFavorite(product: Product, _size?: string, _color?: string) {
     if (!requireLogin("Faça login para favoritar peças.")) return false;
 
-    setFavorites((prev) => {
-      if (prev.some((item) => item.id === product.id)) {
-        return prev.filter((item) => item.id !== product.id);
-      }
-
-      const newItem: FavoriteItem = {
-        id: product.id,
-        name: product.name,
-        image: product.image,
-        size,
-        colorName: getColorName(color),
-        price: product.price,
-      };
-      return [...prev, newItem];
-    });
-
+    void data.toggleFavorite(product.id);
     return true;
   }
 
-  function isFavorite(productId: string) {
-    return favorites.some((item) => item.id === productId);
-  }
-
   function removeFavorite(id: string) {
-    setFavorites((prev) => prev.filter((item) => item.id !== id));
+    if (data.isFavorite(id)) void data.toggleFavorite(id); 
   }
 
   return (
     <ShopContext.Provider
       value={{
-        cart,
-        favorites,
+        products: data.products,
+        loadingProducts: data.loadingProducts,
+        productsError: data.productsError,
+        reloadProducts: data.reloadProducts,
+        cart: data.cartItems,
+        cartNotice: data.cartNotice,
+        canCheckout: data.canCheckout,
         addToCart,
         changeQuantity,
         removeFromCart,
         clearCart,
+        checkout: data.checkout,
+        reloadCart,
+        favorites: data.favoriteItems,
         toggleFavorite,
-        isFavorite,
+        isFavorite: data.isFavorite,
         removeFavorite,
       }}
     >

@@ -1,9 +1,7 @@
-// Um item salvo nos favoritos da pessoa (produto + variação escolhida)
 export type FavoriteItem = {
-  id: string;
+  id: string; // id do produto
   name: string;
   image: string;
-  size: string;
-  colorName: string;
   price: number;
+  colors: string[]; // nomes das cores disponíveis (ex.: "Preto", "Pink")
 };

@@ -1,25 +1,25 @@
-// Status possíveis de um pedido, na ordem do fluxo de venda
-export type OrderStatus = "Aguardando" | "Confirmado" | "Enviado" | "Entregue";
+export type OrderStatus = "Aguardando" | "Confirmado" | "Enviado" | "Entregue" | "Cancelado";
 
-// Uma peça dentro do pedido 
+// Uma peça dentro do pedido
 export type OrderItem = {
-  productId: string; 
+  productId: string;
   name: string;
   image: string;
   size: string;
   colorName: string;
   quantity: number;
-  price: number; 
+  price: number;
 };
 
 // Um pedido feito por um cliente
 export type Order = {
-  id: string;
+  id: string; // código exibido, ex.: "ORD-001"
+  apiId?: number; 
   customerName: string;
-  customerEmail: string; 
+  customerEmail: string;
   items: OrderItem[];
   total: number;
-  date: string; 
+  date: string;
   status: OrderStatus;
-  stockDeducted?: boolean; 
+  stockDeducted?: boolean;
 };

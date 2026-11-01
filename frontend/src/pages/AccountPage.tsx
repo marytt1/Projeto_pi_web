@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../components/AuthContext";
 
 const INPUT_CLASS =
@@ -10,17 +9,16 @@ const INPUT_CLASS =
 export default function AccountPage() {
   const { user, changePassword } = useAuth();
 
-  const [showCurrent, setShowCurrent] = useState(false);
-
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [saving, setSaving] = useState(false); // true enquanto a API responde
 
   if (!user) return null;
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
     setSuccess("");
@@ -30,7 +28,10 @@ export default function AccountPage() {
       return;
     }
 
-    const result = changePassword(currentPassword, newPassword);
+    setSaving(true);
+    const result = await changePassword(currentPassword, newPassword);
+    setSaving(false);
+
     if (result.ok) {
       setSuccess(result.message);
       setCurrentPassword("");
@@ -58,26 +59,6 @@ export default function AccountPage() {
             <label className="text-xs text-neutral-500 mb-1.5 block">Email</label>
             <input value={user.email} disabled className={`${INPUT_CLASS} text-neutral-500`} />
           </div>
-
-          <div>
-            <label className="text-xs text-neutral-500 mb-1.5 block">Senha atual</label>
-            <div className="relative">
-              <input
-                type={showCurrent ? "text" : "password"}
-                value={user.password}
-                disabled
-                className={`${INPUT_CLASS} pr-10 text-neutral-500`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowCurrent((prev) => !prev)}
-                aria-label="Mostrar senha"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400"
-              >
-                {showCurrent ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -94,7 +75,7 @@ export default function AccountPage() {
           />
           <input
             type="password"
-            placeholder="Nova senha (mínimo 6 caracteres)"
+            placeholder="Nova senha (mínimo 8 caracteres)"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             className={INPUT_CLASS}
@@ -114,9 +95,10 @@ export default function AccountPage() {
 
           <button
             type="submit"
-            className="w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full"
+            disabled={saving}
+            className="w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Salvar nova senha
+            {saving ? "Salvando..." : "Salvar nova senha"}
           </button>
         </form>
       </section>

@@ -5,7 +5,7 @@ import { X } from "lucide-react";
 import { useAuth } from "../components/AuthContext";
 import PasswordField from "../components/PasswordField";
 
-// Página de redefinição de senha, funcionando apenas com um token válido (criado em "Esqueci minha senha" e que vale por 15 minutos)
+// Página de redefinição de senha, aberta pelo link enviado por email (criado em "Esqueci minha senha" e que vale por 30 minutos)
 export default function ResetPasswordPage() {
   const { isResetTokenValid, resetPassword } = useAuth();
   const navigate = useNavigate();
@@ -14,15 +14,16 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
-  // Confere o link uma vez, quando a página abre
+  // Confere se o link tem um token. Quem valida de verdade (e confere o prazo) é a API, ao salvar a senha
   const [tokenValid] = useState(() => isResetTokenValid(token));
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState(false); // true depois de redefinir com sucesso
+  const [saving, setSaving] = useState(false); // true enquanto a API responde
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
 
@@ -31,7 +32,10 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    const result = resetPassword(token, newPassword);
+    setSaving(true);
+    const result = await resetPassword(token, newPassword);
+    setSaving(false);
+
     if (result.ok) setDone(true);
     else setError(result.message);
   }
@@ -72,7 +76,7 @@ export default function ResetPasswordPage() {
           {tokenValid && !done && (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <p className="text-xs text-neutral-500 text-center">
-                Digite e confirme a sua nova senha (mínimo de 6 caracteres).
+                Digite e confirme a sua nova senha (mínimo de 8 caracteres).
               </p>
 
               <PasswordField value={newPassword} onChange={setNewPassword} placeholder="Nova senha" />
@@ -86,9 +90,10 @@ export default function ResetPasswordPage() {
 
               <button
                 type="submit"
-                className="w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full"
+                disabled={saving}
+                className="w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Redefinir senha
+                {saving ? "Salvando..." : "Redefinir senha"}
               </button>
             </form>
           )}
