@@ -2,16 +2,18 @@ import type { Product, ProductBadge, ProductCategory, ProductVariant, ColorOptio
 import type { CartItem } from "../types/cart";
 import type { FavoriteItem } from "../types/favorite";
 import { imageUrl } from "./api";
+import { COLOR_NAMES } from "../data/colors";
 import type { Order, OrderStatus } from "../types/order";
 import type { StockItem } from "../types/stock";
 import type { User } from "../types/user";
 
-// formatos da API
+//formatos da API
 export type ApiVariant = { id: number; sku: string; size: string; color: string; stock: number };
 
 export type ApiProduct = {
   id: number;
   name: string;
+  description?: string | null;
   price: number;
   oldPrice?: number | null;
   category: string;
@@ -40,21 +42,17 @@ export type ApiFavorite = {
 };
 
 // cores
-const COLOR_HEX: Record<string, string> = {
-  Preto: "#111111",
-  Borgonha: "#8b1538",
-  Pink: "#e0399c",
-  Rosa: "#e76ea3",
-  "Rosa Claro": "#f2b9c9",
-  Vinho: "#3a1116",
-};
+const COLOR_HEX: Record<string, string> = {};
+for (const [hex, name] of Object.entries(COLOR_NAMES)) {
+  if (!(name in COLOR_HEX)) COLOR_HEX[name] = hex;
+}
 const FALLBACK_HEX = "#cccccc";
 export const colorHex = (name: string) => COLOR_HEX[name] ?? FALLBACK_HEX;
 
 // tamanhos
 const SIZE_ORDER = ["PP", "P", "M", "G", "GG", "XG"];
 
-function compareSizes(a: string, b: string) {
+export function compareSizes(a: string, b: string) {
   const ia = SIZE_ORDER.indexOf(a);
   const ib = SIZE_ORDER.indexOf(b);
   if (ia !== -1 && ib !== -1) return ia - ib;
@@ -64,15 +62,15 @@ function compareSizes(a: string, b: string) {
 }
 
 // selos (badge)
-const LOW_STOCK_TOTAL = 5; 
-const NEW_DAYS = 30; 
+const LOW_STOCK_TOTAL = 5; // "Pouco Estoque" quando o total de unidades é igual ou menor que isso
+const NEW_DAYS = 30; // "Novo" nos primeiros 30 dias
 
 function buildBadge(p: ApiProduct, totalStock: number): ProductBadge | undefined {
   if (p.oldPrice && p.oldPrice > p.price) return { label: "Promoção", tone: "promo" };
   if (totalStock > 0 && totalStock <= LOW_STOCK_TOTAL) return { label: "Pouco Estoque", tone: "estoque" };
   const ageDays = (Date.now() - new Date(p.createdAt).getTime()) / 86_400_000;
   if (ageDays <= NEW_DAYS) return { label: "Novo", tone: "novo" };
-  return undefined; 
+  return undefined; // 
 }
 
 // produto
@@ -87,6 +85,7 @@ export function toProduct(p: ApiProduct): Product {
   return {
     id: String(p.id),
     name: p.name,
+    description: p.description ?? undefined,
     price: p.price,
     oldPrice: p.oldPrice ?? undefined,
     category: p.category as ProductCategory,
@@ -105,6 +104,29 @@ export function toProduct(p: ApiProduct): Product {
 // Descobre qual variação o cliente escolheu (cor + tamanho). O id dela vai para cart.add(Number(id)).
 export function findVariant(product: Product, size: string, colorName: string): ProductVariant | null {
   return product.variants?.find((v) => v.size === size && v.colorName === colorName) ?? null;
+}
+
+// A mesma busca, mas com a cor em hexadecimal (como o card e a página do produto guardam a escolha)
+export function variantFor(product: Product, size: string, colorHex: string): ProductVariant | null {
+  const colorName = product.colorOptions?.find((c) => c.hex === colorHex)?.name;
+  return colorName ? findVariant(product, size, colorName) : null;
+}
+
+// true se essa cor + tamanho existem e têm estoque.
+// Produto sem lista de variações (dados de exemplo): considera disponível.
+export function isCombinationAvailable(product: Product, size: string, colorHex: string): boolean {
+  if (!product.variants) return true;
+  return (variantFor(product, size, colorHex)?.stock ?? 0) > 0;
+}
+
+// Cor e tamanho que aparecem selecionados quando o card abre: a primeira variação com estoque
+export function pickDefaultSelection(product: Product): { color: string; size: string } {
+  const first = product.variants?.find((v) => v.stock > 0);
+  if (first) {
+    const color = product.colorOptions?.find((c) => c.name === first.colorName)?.hex ?? product.colors[0];
+    return { color, size: first.size };
+  }
+  return { color: product.colors[0], size: product.sizes[0] };
 }
 
 // carrinho
@@ -142,7 +164,7 @@ export function toFavoriteItem(f: ApiFavorite): FavoriteItem {
 // ADMIN
 export type ApiOrder = {
   id: number;
-  code: string; 
+  code: string; // "ORD-001"
   customer: { id: number | null; name: string | null; email: string | null } | null;
   items: {
     productId: number | null;
@@ -226,6 +248,7 @@ export function toStockItem(r: ApiStockRow): StockItem {
   };
 }
 
+// A API devolve isAdmin; o front usa "role"
 export function toUser(u: ApiUser): User {
   return { id: u.id, name: u.name, email: u.email, role: u.isAdmin ? "admin" : "cliente" };
 }

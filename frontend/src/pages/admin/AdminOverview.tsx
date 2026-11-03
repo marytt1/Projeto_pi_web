@@ -1,36 +1,58 @@
-import { useState } from "react";
-import { TrendingUp, Package, AlertTriangle, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router";
+import { TrendingUp, Package, AlertTriangle, Search, ChevronRight } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
 import { useOrders } from "../../components/OrdersContext";
 import { matchesSearch } from "../../components/Search";
-import { formatDate, sortNewestFirst, summarizeItems } from "../../components/Orders";
+import { sortNewestFirst, summarizeItems } from "../../components/Orders";
+import Pagination from "../../components/Pagination";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+const PAGE_SIZE = 5; // pedidos por página na lista
+
 // Página que exibe o painel principal com métricas resumidas (vendas, pendências, alertas) e os últimos pedidos realizados
 export default function AdminOverview() {
- const { orders, stock } = useOrders();
+  const { orders, dashboard, loading, error, reload } = useOrders();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-  const today = formatDate(new Date());
+  // Ao abrir a tela, busca os dados mais recentes na API
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
-  const confirmedToday = orders.filter((o) => o.date === today && o.status !== "Aguardando");
-  const salesToday = confirmedToday.reduce((sum, o) => sum + o.total, 0);
+  // Os números dos cards já vêm calculados pela API
+  const salesToday = dashboard?.salesToday.total ?? 0;
+  const salesCount = dashboard?.salesToday.orders ?? 0;
+  const pendingOrders = dashboard?.pendingOrders ?? 0;
+  const stockAlerts = dashboard?.stockAlerts.count ?? 0;
+  const stockLimit = dashboard?.stockAlerts.limit ?? 3;
 
-  const pendingOrders = orders.filter((o) => o.status === "Aguardando").length;
+  const matchingOrders = sortNewestFirst(orders).filter((o) =>
+    matchesSearch(search, o.id, o.customerName, o.customerEmail, summarizeItems(o.items), o.status)
+  );
 
-  const stockAlerts = stock.filter((row) => row.stock <= 3).length;
-
-  const recentOrders = sortNewestFirst(orders)
-    .slice(0, 5)
-    .filter((o) => matchesSearch(search, o.id, o.customerName, o.customerEmail, summarizeItems(o.items), o.status));
+  // Paginação: 5 pedidos por vez, com setinhas para ver os outros
+  const pageCount = Math.max(1, Math.ceil(matchingOrders.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const recentOrders = matchingOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div>
       <AdminTopBar title="Visão Geral" />
+
+      {error && (
+        <div className="mb-5 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+          <span>{error}</span>
+          <button onClick={() => reload()} className="underline text-xs">
+            Tentar novamente
+          </button>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-2xl shadow p-5">
@@ -42,7 +64,7 @@ export default function AdminOverview() {
           </div>
           <p className="text-2xl font-semibold">{formatPrice(salesToday)}</p>
           <p className="text-xs text-neutral-400 mt-1">
-            {confirmedToday.length} pedido{confirmedToday.length !== 1 && "s"} com pagamento confirmado
+            {salesCount} pedido{salesCount !== 1 && "s"} com pagamento confirmado
           </p>
         </div>
 
@@ -65,20 +87,29 @@ export default function AdminOverview() {
             </span>
           </div>
           <p className="text-2xl font-semibold">{stockAlerts}</p>
-          <p className="text-xs text-neutral-400 mt-1">variações com 3 ou menos unidades</p>
+          <p className="text-xs text-neutral-400 mt-1">variações com {stockLimit} ou menos unidades</p>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
-          <h3 className="font-medium">Últimos Pedidos</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="font-medium">Últimos Pedidos</h3>
+            <Link to="/admin/vendas" className="flex items-center gap-1 text-xs text-[#8b1538] hover:underline">
+              Ver todas as vendas
+              <ChevronRight size={14} />
+            </Link>
+          </div>
           <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-full px-3 py-1.5 w-56">
             <Search size={14} className="text-neutral-400" />
             <input
               type="text"
               placeholder="Buscar pedido.."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="text-sm outline-none w-full placeholder:text-neutral-400"
             />
           </div>
@@ -114,8 +145,12 @@ export default function AdminOverview() {
           </tbody>
         </table>
 
+        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={matchingOrders.length} onChange={setPage} />
+
         {recentOrders.length === 0 && (
-          <p className="text-sm text-neutral-400 text-center py-8">Nenhum pedido encontrado.</p>
+          <p className="text-sm text-neutral-400 text-center py-8">
+            {loading ? "Carregando..." : "Nenhum pedido encontrado."}
+          </p>
         )}
       </div>
     </div>

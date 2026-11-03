@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft, ShoppingBag, Heart } from "lucide-react";
-import { PRODUCTS } from "../data/products";
 import type { Product } from "../types/product";
 import { useShop } from "../components/ShopContext";
+import { isCombinationAvailable, pickDefaultSelection, variantFor } from "../services/adapters";
+import { getColorName } from "../data/colors";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -12,13 +13,24 @@ function formatPrice(value: number) {
 // Página de detalhes do produto que exibe galeria de imagens, informações do item, seleção de cor e tamanho, e ações de compra e favoritos
 export default function ProductDetailPage() {
   const { id } = useParams();
+  const { products, loadingProducts, productsError } = useShop();
 
-  const product = PRODUCTS.find((p) => p.id === id);
+  // O id da URL é o id do produto na API (ex.: /produto/3)
+  const product = products.find((p) => p.id === id);
 
   if (!product) {
+    if (loadingProducts) {
+      return (
+        <main className="px-6 md:px-10 py-16 max-w-xl mx-auto text-center">
+          <p className="text-sm text-neutral-400">Carregando produto...</p>
+        </main>
+      );
+    }
+
     return (
       <main className="px-6 md:px-10 py-16 max-w-xl mx-auto text-center">
         <h1 className="font-serif text-3xl text-[#8b1538]">Produto não encontrado</h1>
+        {productsError && <p className="text-sm text-red-600 mt-3">{productsError}</p>}
         <Link to="/catalogo" className="inline-block mt-4 text-sm text-[#8b1538] hover:underline">
           Voltar ao catálogo
         </Link>
@@ -26,7 +38,8 @@ export default function ProductDetailPage() {
     );
   }
 
-  return <ProductDetail product={product} />;
+  // key: ao ir de um produto para outro, a escolha de cor e tamanho recomeça
+  return <ProductDetail key={product.id} product={product} />;
 }
 
 type ProductDetailProps = {
@@ -34,22 +47,40 @@ type ProductDetailProps = {
 };
 
 function ProductDetail({ product }: ProductDetailProps) {
-  const gallery = [product.image, product.image, product.image];
+  // Hoje cada produto tem uma imagem
+  const gallery = product.image ? [product.image] : [];
 
   const [activeImage, setActiveImage] = useState(gallery[0]);
-  const [selectedColor, setSelectedColor] = useState(product.colors[0]);
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
+
+  // Começa na primeira combinação de cor e tamanho que tem estoque
+  const initial = pickDefaultSelection(product);
+  const [selectedColor, setSelectedColor] = useState(initial.color);
+  const [selectedSize, setSelectedSize] = useState(initial.size);
   const [added, setAdded] = useState(false);
 
   const { addToCart, toggleFavorite, isFavorite } = useShop();
   const favorite = isFavorite(product.id);
 
-  function handleAddToCart() {
-  if (!addToCart(product, selectedSize, selectedColor)) return;
+  const available = isCombinationAvailable(product, selectedSize, selectedColor);
+  const stock = variantFor(product, selectedSize, selectedColor)?.stock;
+  const colorName = product.colorOptions?.find((c) => c.hex === selectedColor)?.name ?? getColorName(selectedColor);
+  const blocked = product.soldOut || !available;
 
-  setAdded(true);
-  setTimeout(() => setAdded(false), 1500);
-}
+  // Ao trocar a cor, se o tamanho escolhido não existe nela, vai para o primeiro tamanho que existe
+  function handleColorChange(color: string) {
+    setSelectedColor(color);
+    if (!isCombinationAvailable(product, selectedSize, color)) {
+      const firstSize = product.sizes.find((size) => isCombinationAvailable(product, size, color));
+      if (firstSize) setSelectedSize(firstSize);
+    }
+  }
+
+  function handleAddToCart() {
+    if (!addToCart(product, selectedSize, selectedColor)) return;
+
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
 
   return (
     <main className="px-6 md:px-10 py-8 max-w-6xl mx-auto">
@@ -61,37 +92,49 @@ function ProductDetail({ product }: ProductDetailProps) {
         Voltar ao Catálogo
       </Link>
 
-      <div className="grid md:grid-cols-[100px_1fr_1fr] gap-6">
-        <div className="flex md:flex-col gap-3 order-2 md:order-1">
-          {gallery.map((thumb, index) => (
-            <button
-              key={index}
-              onClick={() => setActiveImage(thumb)}
-              className={`w-full aspect-square rounded-lg overflow-hidden border-2 ${
-                activeImage === thumb ? "border-[#8b1538]" : "border-transparent"
-              }`}
-            >
-              <img src={thumb} alt="" className="w-full h-full object-cover" />
-            </button>
-          ))}
-        </div>
+      <div className={`grid gap-6 ${gallery.length > 1 ? "md:grid-cols-[100px_1fr_1fr]" : "md:grid-cols-[1fr_1fr]"}`}>
+        {gallery.length > 1 && (
+          <div className="flex md:flex-col gap-3 order-2 md:order-1">
+            {gallery.map((thumb, index) => (
+              <button
+                key={index}
+                onClick={() => setActiveImage(thumb)}
+                className={`w-full aspect-square rounded-lg overflow-hidden border-2 ${
+                  activeImage === thumb ? "border-[#8b1538]" : "border-transparent"
+                }`}
+              >
+                <img src={thumb} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="order-1 md:order-2 aspect-[3/4] rounded-xl overflow-hidden bg-neutral-100">
-          <img src={activeImage} alt={product.name} className="w-full h-full object-cover" />
+          {activeImage ? (
+            <img src={activeImage} alt={product.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-sm text-neutral-300">Sem imagem</div>
+          )}
         </div>
 
         <div className="order-3">
           <h1 className="font-serif text-3xl text-[#8b1538]">{product.name}</h1>
 
-          <p className="text-sm text-neutral-600 mt-4 leading-relaxed">
-            Peça versátil e elegante, perfeita para acompanhar diferentes
-            momentos do seu dia. Com design moderno e confortável,
-            proporciona liberdade de movimento e muito estilo.
-          </p>
-          <p className="text-sm italic text-[#8b1538] mt-2">
-            Uma peça prática para você se sentir bem e confiante em
-            qualquer ocasião.
-          </p>
+          {product.description ? (
+            <p className="text-sm text-neutral-600 mt-4 leading-relaxed whitespace-pre-line">{product.description}</p>
+          ) : (
+            <>
+              <p className="text-sm text-neutral-600 mt-4 leading-relaxed">
+                Peça versátil e elegante, perfeita para acompanhar diferentes
+                momentos do seu dia. Com design moderno e confortável,
+                proporciona liberdade de movimento e muito estilo.
+              </p>
+              <p className="text-sm italic text-[#8b1538] mt-2">
+                Uma peça prática para você se sentir bem e confiante em
+                qualquer ocasião.
+              </p>
+            </>
+          )}
 
           <hr className="my-5 border-neutral-100" />
 
@@ -110,8 +153,9 @@ function ProductDetail({ product }: ProductDetailProps) {
             {product.colors.map((color) => (
               <button
                 key={color}
-                onClick={() => setSelectedColor(color)}
-                aria-label={`Cor ${color}`}
+                onClick={() => handleColorChange(color)}
+                aria-label={`Cor ${getColorName(color)}`}
+                title={getColorName(color)}
                 className={`w-7 h-7 rounded-full border-2 ${
                   selectedColor === color ? "border-[#8b1538]" : "border-transparent"
                 }`}
@@ -119,28 +163,43 @@ function ProductDetail({ product }: ProductDetailProps) {
               />
             ))}
           </div>
+          <p className="text-xs text-neutral-500 mt-2">Cor: {colorName}</p>
 
           <div className="flex items-center gap-2 mt-4">
-            {product.sizes.map((size) => (
-              <button
-                key={size}
-                onClick={() => setSelectedSize(size)}
-                className={`w-10 h-9 rounded-lg border text-sm transition-colors ${
-                  selectedSize === size
-                    ? "bg-[#8b1538] text-white border-[#8b1538]"
-                    : "border-neutral-200 text-neutral-500"
-                }`}
-              >
-                {size}
-              </button>
-            ))}
+            {product.sizes.map((size) => {
+              const sizeAvailable = isCombinationAvailable(product, size, selectedColor);
+
+              return (
+                <button
+                  key={size}
+                  onClick={() => setSelectedSize(size)}
+                  disabled={!sizeAvailable}
+                  title={sizeAvailable ? undefined : "Indisponível nesta cor"}
+                  className={`w-10 h-9 rounded-lg border text-sm transition-colors ${
+                    !sizeAvailable
+                      ? "border-neutral-200 text-neutral-300 line-through cursor-not-allowed"
+                      : selectedSize === size
+                      ? "bg-[#8b1538] text-white border-[#8b1538]"
+                      : "border-neutral-200 text-neutral-500"
+                  }`}
+                >
+                  {size}
+                </button>
+              );
+            })}
           </div>
 
+          {available && stock !== undefined && stock <= 3 && (
+            <p className="text-xs text-amber-600 mt-3">
+              Restam apenas {stock} unidade{stock !== 1 && "s"}.
+            </p>
+          )}
+
           <button
-            disabled={product.soldOut}
+            disabled={blocked}
             onClick={handleAddToCart}
             className={`w-full mt-6 flex items-center justify-center gap-2 text-sm font-medium py-3 rounded-full transition-colors ${
-              product.soldOut
+              blocked
                 ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
                 : added
                 ? "bg-emerald-600 text-white"
@@ -148,11 +207,17 @@ function ProductDetail({ product }: ProductDetailProps) {
             }`}
           >
             <ShoppingBag size={16} />
-            {product.soldOut ? "Produto Esgotado" : added ? "Adicionado ao carrinho!" : "Adicionar ao Carrinho"}
+            {product.soldOut
+              ? "Produto Esgotado"
+              : !available
+              ? "Combinação indisponível"
+              : added
+              ? "Adicionado ao carrinho!"
+              : "Adicionar ao Carrinho"}
           </button>
 
           <button
-            onClick={() => toggleFavorite(product, selectedSize, selectedColor)}
+            onClick={() => toggleFavorite(product)}
             className="w-full mt-3 flex items-center justify-center gap-2 border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0] transition-colors text-sm font-medium py-3 rounded-full"
           >
             <Heart size={16} className={favorite ? "fill-[#8b1538]" : ""} />

@@ -1,14 +1,13 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { matchesSearch } from "../components/Search";
+import { matchesSearch, normalizeText } from "../components/Search";
 import CatalogProductCard from "../components/CatalogProductCard";
 import { useShop } from "../components/ShopContext";
-import { PRODUCTS } from "../data/products";
+import { compareSizes } from "../services/adapters";
+import { getColorName } from "../data/colors";
 import type { ProductCategory } from "../types/product";
 
-const CATEGORY_OPTIONS: ProductCategory[] = ["Cropped", "Macaquinho", "Shorts", "Top"];
-const SIZE_OPTIONS = ["P", "M", "G", "GG"];
-const COLOR_OPTIONS = ["#111111", "#8b1538", "#e0399c", "#f2b9c9"];
+const CATEGORY_OPTIONS: ProductCategory[] = ["Cropped", "Leggings", "Macaquinho", "Shorts", "Top"];
 
 // Página de catálogo com barra lateral de filtros interativos (categoria, tamanho, cor e preço) e listagem dinâmica de produtos
 export default function CatalogPage() {
@@ -18,10 +17,11 @@ export default function CatalogPage() {
   const categoryParam = searchParams.get("categoria");
   const searchTerm = searchParams.get("busca") ?? "";
 
+  // Lê o ?categoria= da URL sem diferenciar maiúsculas, minúsculas e acentos ("leggings" = "Leggings")
   function paramToCategories(): ProductCategory[] {
-    return CATEGORY_OPTIONS.includes(categoryParam as ProductCategory)
-      ? [categoryParam as ProductCategory]
-      : [];
+    if (!categoryParam) return [];
+    const match = CATEGORY_OPTIONS.find((option) => normalizeText(option) === normalizeText(categoryParam));
+    return match ? [match] : [];
   }
 
   const [selectedCategories, setSelectedCategories] = useState<ProductCategory[]>(paramToCategories);
@@ -29,7 +29,13 @@ export default function CatalogPage() {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
-  const { isFavorite, toggleFavorite } = useShop();
+
+  // Os produtos agora vêm da API
+  const { products, loadingProducts, productsError, reloadProducts, isFavorite, toggleFavorite } = useShop();
+
+  // As opções de tamanho e de cor do filtro saem dos produtos cadastrados
+  const sizeOptions = useMemo(() => [...new Set(products.flatMap((p) => p.sizes))].sort(compareSizes), [products]);
+  const colorOptions = useMemo(() => [...new Set(products.flatMap((p) => p.colors))], [products]);
 
   useEffect(() => {
     setSelectedCategories(paramToCategories());
@@ -42,8 +48,8 @@ export default function CatalogPage() {
   }
 
   const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((product) => {
-      
+    return products.filter((product) => {
+
       if (!matchesSearch(searchTerm, product.name, product.category)) {
         return false;
       }
@@ -64,7 +70,7 @@ export default function CatalogPage() {
       }
       return true;
     });
-  }, [searchTerm, selectedCategories, selectedSize, selectedColor, minPrice, maxPrice]);
+  }, [products, searchTerm, selectedCategories, selectedSize, selectedColor, minPrice, maxPrice]);
 
   return (
     <>
@@ -91,7 +97,7 @@ export default function CatalogPage() {
             <div>
               <h3 className="font-medium mb-3">Tamanho</h3>
               <div className="flex flex-wrap gap-2">
-                {SIZE_OPTIONS.map((size) => (
+                {sizeOptions.map((size) => (
                   <button
                     key={size}
                     onClick={() => setSelectedSize((prev) => (prev === size ? null : size))}
@@ -110,11 +116,12 @@ export default function CatalogPage() {
             <div>
               <h3 className="font-medium mb-3">Cor</h3>
               <div className="flex flex-wrap gap-2">
-                {COLOR_OPTIONS.map((color) => (
+                {colorOptions.map((color) => (
                   <button
                     key={color}
                     onClick={() => setSelectedColor((prev) => (prev === color ? null : color))}
-                    aria-label={`Filtrar pela cor ${color}`}
+                    aria-label={`Filtrar pela cor ${getColorName(color)}`}
+                    title={getColorName(color)}
                     className={`w-7 h-7 rounded-full border-2 ${
                       selectedColor === color ? "border-[#8b1538]" : "border-transparent"
                     }`}
@@ -147,7 +154,14 @@ export default function CatalogPage() {
           </aside>
 
           <div>
-            
+            {productsError && (
+              <div className="mb-5 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+                <span>{productsError}</span>
+                <button onClick={() => reloadProducts()} className="underline text-xs">
+                  Tentar novamente
+                </button>
+              </div>
+            )}
 
             {searchTerm && (
               <p className="text-sm text-neutral-500 mb-4">
@@ -161,9 +175,13 @@ export default function CatalogPage() {
               </p>
             )}
 
-            {filteredProducts.length === 0 ? (
+            {loadingProducts && products.length === 0 ? (
+              <p className="text-sm text-neutral-400 text-center py-20">Carregando produtos...</p>
+            ) : filteredProducts.length === 0 ? (
               <p className="text-sm text-neutral-400 text-center py-20">
-                Nenhum produto encontrado com esses filtros.
+                {products.length === 0
+                  ? "Nenhum produto cadastrado ainda."
+                  : "Nenhum produto encontrado com esses filtros."}
               </p>
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
@@ -172,14 +190,8 @@ export default function CatalogPage() {
                     key={product.id}
                     product={product}
                     isFavorite={isFavorite(product.id)}
-                    
-                    onToggleFavorite={() =>
-                      toggleFavorite(
-                        product,
-                        selectedSize && product.sizes.includes(selectedSize) ? selectedSize : undefined,
-                        selectedColor && product.colors.includes(selectedColor) ? selectedColor : undefined
-                      )
-                    }
+
+                    onToggleFavorite={() => toggleFavorite(product)}
                     onViewDetails={(id) => navigate(`/produto/${id}`)}
                   />
                 ))}

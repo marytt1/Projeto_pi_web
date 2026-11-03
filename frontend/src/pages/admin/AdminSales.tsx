@@ -1,35 +1,93 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, Check } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
 import { useOrders } from "../../components/OrdersContext";
 import { matchesSearch } from "../../components/Search";
 import { sortNewestFirst, summarizeItems } from "../../components/Orders";
-import type { OrderStatus } from "../../types/order";
+import type { Order, OrderStatus } from "../../types/order";
+import Pagination from "../../components/Pagination";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+const PAGE_SIZE = 10; // pedidos por página
 
 const ACTION_LABEL: Record<OrderStatus, string | null> = {
   Aguardando: "Confirmar Pgto & Baixar Estoque",
   Confirmado: "Marcar como Enviado",
   Enviado: "Marcar como Entregue",
   Entregue: null,
+  Cancelado: null,
 };
 
 // Página de vendas que exibe a gestão da listagem de vendas com busca e atualização do status de pagamento dos pedidos
 export default function AdminSales() {
-  const { orders, advanceOrder } = useOrders();
+  const { orders, advanceOrder, loading, error, reload } = useOrders();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [busyId, setBusyId] = useState<string | null>(null); // pedido sendo atualizado na API
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Ao abrir a tela, busca os pedidos mais recentes na API
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // Avança o pedido na API. Se faltar estoque (ou outro problema), a mensagem da API aparece na tela.
+  async function handleAdvance(order: Order) {
+    setBusyId(order.id);
+    setMessage(null);
+
+    const result = await advanceOrder(order.id);
+    setBusyId(null);
+
+    if (result.ok) {
+      setMessage({
+        ok: true,
+        text:
+          order.status === "Aguardando"
+            ? `Pagamento do pedido ${order.id} confirmado e estoque atualizado.`
+            : `Pedido ${order.id} atualizado.`,
+      });
+    } else {
+      setMessage({ ok: false, text: result.message ?? "Não foi possível atualizar o pedido." });
+    }
+  }
 
   const filteredOrders = sortNewestFirst(orders).filter((order) =>
     matchesSearch(search, order.id, order.customerName, order.customerEmail, summarizeItems(order.items), order.status)
   );
 
+  // Paginação: mostra PAGE_SIZE pedidos por vez, com setinhas para as outras páginas
+  const pageCount = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   return (
     <div>
       <AdminTopBar title="Vendas e Pedidos" />
+
+      {error && (
+        <div className="mb-5 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+          <span>{error}</span>
+          <button onClick={() => reload()} className="underline text-xs">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {message && (
+        <p
+          className={`mb-5 text-sm rounded-lg px-4 py-3 ${
+            message.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
@@ -40,7 +98,10 @@ export default function AdminSales() {
               type="text"
               placeholder="Buscar pedido.."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="text-sm outline-none w-full placeholder:text-neutral-400"
             />
           </div>
@@ -59,7 +120,7 @@ export default function AdminSales() {
             </tr>
           </thead>
           <tbody>
-            {filteredOrders.map((order) => {
+            {pageOrders.map((order) => {
               const actionLabel = ACTION_LABEL[order.status];
 
               return (
@@ -78,15 +139,16 @@ export default function AdminSales() {
                   <td className="px-6 py-4">
                     {actionLabel && (
                       <button
-                        onClick={() => advanceOrder(order.id)}
-                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap transition-colors ${
+                        onClick={() => handleAdvance(order)}
+                        disabled={busyId !== null}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                           order.status === "Aguardando"
                             ? "bg-[#8b1538] hover:bg-[#71102d] text-white"
                             : "border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0]"
                         }`}
                       >
                         <Check size={13} />
-                        {actionLabel}
+                        {busyId === order.id ? "Processando..." : actionLabel}
                       </button>
                     )}
                   </td>
@@ -96,8 +158,12 @@ export default function AdminSales() {
           </tbody>
         </table>
 
+        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredOrders.length} onChange={setPage} />
+
         {filteredOrders.length === 0 && (
-          <p className="text-sm text-neutral-400 text-center py-8">Nenhum pedido encontrado.</p>
+          <p className="text-sm text-neutral-400 text-center py-8">
+            {loading ? "Carregando..." : "Nenhum pedido encontrado."}
+          </p>
         )}
       </div>
     </div>

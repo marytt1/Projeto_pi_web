@@ -9,8 +9,7 @@ import ProductCard from "./ProductCard";
 import CategoryCard from "./CategoryCard";
 import VideoCard from "./VideoCard";
 import InstagramIcon from "./icons/InstagramIcon";
-
-import { PRODUCTS } from "../data/products";
+import { useShop } from "./ShopContext";
 import { CATEGORIES } from "../data/categories";
 import { VIDEOS } from "../data/videos";
 import { FEATURES } from "../data/features";
@@ -23,7 +22,7 @@ import { STORE_LINKS } from "../data/links";
 const HIDE_SCROLLBAR =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
-const FILTERS = ["Todos", "Top", "Shorts", "Macaquinho", "Cropped"] as const;
+const FILTERS = ["Todos", "Top", "Shorts", "Macaquinho", "Cropped", "Leggings"] as const;
 
 // Componente principal da página inicial que reúne hero, categorias, produtos em destaque, vídeos, guia de tamanhos, diferenciais da marca e feed do Instagram
 export default function Main() {
@@ -133,12 +132,18 @@ function CategoryShowcase() {
   );
 }
 
+// Quantos produtos aparecem na página inicial (o catálogo completo fica em /catalogo)
+const FEATURED_LIMIT = 6;
 
 function FeaturedProducts() {
   const [active, setActive] = useState<(typeof FILTERS)[number]>("Todos");
 
+  const { products, loadingProducts, productsError, reloadProducts } = useShop();
+
   const filtered =
-    active === "Todos" ? PRODUCTS : PRODUCTS.filter((p) => p.category === active);
+    active === "Todos" ? products : products.filter((p) => p.category === active);
+
+  const featured = filtered.slice(0, FEATURED_LIMIT);
 
   return (
     <Section
@@ -165,11 +170,39 @@ function FeaturedProducts() {
         </div>
       }
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-        {filtered.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
+      {productsError && (
+        <div className="mb-6 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+          <span>{productsError}</span>
+          <button onClick={() => reloadProducts()} className="underline text-xs">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {loadingProducts && products.length === 0 ? (
+        <p className="text-sm text-neutral-400 text-center py-16">Carregando produtos...</p>
+      ) : featured.length === 0 ? (
+        <p className="text-sm text-neutral-400 text-center py-16">
+          {products.length === 0 ? "Nenhum produto cadastrado ainda." : "Nenhum produto nesta categoria."}
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
+          {featured.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
+
+      {filtered.length > FEATURED_LIMIT && (
+        <div className="text-center mt-12">
+          <Link
+            to={active === "Todos" ? "/catalogo" : `/catalogo?categoria=${active}`}
+            className="inline-block text-sm font-medium text-[#8b1538] border border-[#8b1538] hover:bg-[#faf1f0] transition-colors px-6 py-3 rounded-full"
+          >
+            Ver todos os produtos
+          </Link>
+        </div>
+      )}
     </Section>
   );
 }

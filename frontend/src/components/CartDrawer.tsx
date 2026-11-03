@@ -36,13 +36,24 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
         ) : (
           items.map((item) => (
             <div key={item.id} className="flex gap-3 px-6 py-4">
-              <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+              {item.image ? (
+                <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
+              ) : (
+                <span className="w-14 h-14 rounded-lg bg-neutral-100 shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[#3a3a3a] truncate">{item.name}</p>
                 <p className="text-xs text-neutral-400">
                   {item.size} · {item.colorName}
                 </p>
                 <p className="text-sm font-semibold text-[#8b1538] mt-0.5">{formatPrice(item.price)}</p>
+
+                {item.status === "out_of_stock" && (
+                  <p className="text-xs text-red-600 mt-0.5">Sem estoque. Remova este item.</p>
+                )}
+                {item.status === "quantity_adjusted" && (
+                  <p className="text-xs text-amber-600 mt-0.5">Só restam {item.available} em estoque.</p>
+                )}
 
                 <div className="flex items-center gap-2 mt-2">
                   <button
@@ -55,7 +66,8 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
                   <span className="text-sm w-4 text-center">{item.quantity}</span>
                   <button
                     onClick={() => onChangeQuantity(item.id, 1)}
-                    className="w-6 h-6 rounded-full border border-neutral-200 flex items-center justify-center text-neutral-500 hover:bg-neutral-50"
+                    disabled={item.available !== undefined && item.quantity >= item.available}
+                    className="w-6 h-6 rounded-full border border-neutral-200 flex items-center justify-center text-neutral-500 hover:bg-neutral-50 disabled:opacity-40 disabled:cursor-not-allowed"
                     aria-label="Aumentar quantidade"
                   >
                     <Plus size={12} />
@@ -82,7 +94,8 @@ export default function CartDrawer({ items, onClose, onChangeQuantity, onRemove,
         <div className="flex gap-2">
           <button
             onClick={onCheckout}
-            className="flex-1 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-2.5 rounded-full"
+            disabled={items.length === 0}
+            className="flex-1 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-2.5 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Finalizar
           </button>
