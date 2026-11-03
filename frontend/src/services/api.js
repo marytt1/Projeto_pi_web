@@ -181,6 +181,14 @@ export const admin = {
 
     // Produtos e variações ("Novo Produto", editar e excluir)
     createProduct: (data) => request(PATHS.products, { method: 'POST', body: data }),
+      // Envia 1 ou mais fotos; "color" (opcional) liga o lote a uma cor
+    uploadProductImages: (id, files, color) => {
+        const form = new FormData();
+        if (color) form.append('color', color);
+        files.forEach((file) => form.append('images', file));
+        return request(`${PATHS.products}/${id}/images`, { method: 'POST', body: form });
+    },
+    deleteProductImage: (id, imageId) => request(`${PATHS.products}/${id}/images/${imageId}`, { method: 'DELETE' }),
     updateProduct: (id, data) => request(`${PATHS.products}/${id}`, { method: 'PUT', body: data }),
     deleteProduct: (id) => request(`${PATHS.products}/${id}`, { method: 'DELETE' }),
     createVariant: (data) => request(PATHS.variants, { method: 'POST', body: data }), // { sku, size, color, stock, ProductId }
@@ -194,3 +202,10 @@ export const admin = {
         return request(`${PATHS.admin}/upload-image`, { method: 'POST', body: form });
     },
 };
+
+// Calculadora de tamanho
+export const sizeGuide = {
+  calculate: (bust, waist, hip) =>
+    request(`${PATHS.users}/size-guide`, { method: 'POST', body: { busto: bust, cintura: waist, quadril: hip } }),
+};
+

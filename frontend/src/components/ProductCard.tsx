@@ -42,9 +42,14 @@ export default function ProductCard({ product }: ProductCardProps) {
     }
   }
 
+  const [notice, setNotice] = useState("");
+        
   function handleAddToCart() {
-    if (!addToCart(product, selectedSize, selectedColor)) return;
-
+    setNotice("");
+    if (!addToCart(product, selectedSize, selectedColor)) {
+      setNotice("Combinação indisponível ou faça login.");
+      return;
+    }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }
@@ -149,6 +154,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         >
           {product.soldOut ? "Produto Esgotado" : !available ? "Combinação indisponível" : added ? "✓ Adicionado!" : "Adicionar ao Carrinho"}
         </button>
+        {notice && <p className="text-[11px] text-red-600 mt-2">{notice}</p>}
       </div>
     </article>
   );

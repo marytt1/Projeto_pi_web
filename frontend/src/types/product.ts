@@ -1,5 +1,5 @@
 // Categorias possíveis de um produto
-export type ProductCategory = "Top" | "Shorts" | "Macaquinho" | "Cropped" | "Leggings";
+export type ProductCategory = string;
 
 // Cor/estilo visual de cada selo (badge) que aparece no card do produto
 export type ProductBadgeTone = "promo" | "estoque" | "novo" | "vendido";
@@ -24,6 +24,13 @@ export type ColorOption = {
   hex: string;
 };
 
+// Foto da galeria de um produto (colorName null = foto geral)
+export type ProductImageItem = {
+  id: string;
+  url: string;
+  colorName: string | null;
+};
+
 // Formato de um produto da vitrine
 export type Product = {
   id: string;
@@ -37,6 +44,8 @@ export type Product = {
   image: string;
   description?: string; // texto que o admin escreve em "Editar produto"
   soldOut?: boolean;
-  colorOptions?: ColorOption[]; // preenchido quando o produto vem da API
-  variants?: ProductVariant[]; // preenchido quando o produto vem da API
+  colorOptions?: ColorOption[];
+  description?: string;
+  variants?: ProductVariant[];
+  images?: ProductImageItem[];  
 };

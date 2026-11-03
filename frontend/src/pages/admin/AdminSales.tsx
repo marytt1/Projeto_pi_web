@@ -57,6 +57,19 @@ export default function AdminSales() {
     }
   }
 
+  const [actionError, setActionError] = useState("");
+  const [advancingId, setAdvancingId] = useState<string | null>(null);
+
+  async function handleAdvance(orderId: string) {
+    setActionError("");
+    setAdvancingId(orderId);
+    const result = await advanceOrder(orderId);
+    setAdvancingId(null);
+    if (!result.ok) {
+      setActionError(result.message ?? "Não foi possível atualizar o pedido.");
+    }
+  
+  }
   const filteredOrders = sortNewestFirst(orders).filter((order) =>
     matchesSearch(search, order.id, order.customerName, order.customerEmail, summarizeItems(order.items), order.status)
   );
@@ -139,8 +152,8 @@ export default function AdminSales() {
                   <td className="px-6 py-4">
                     {actionLabel && (
                       <button
-                        onClick={() => handleAdvance(order)}
-                        disabled={busyId !== null}
+                        onClick={() => handleAdvance(order.id)}
+                        disabled={advancingId === order.id}
                         className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                           order.status === "Aguardando"
                             ? "bg-[#8b1538] hover:bg-[#71102d] text-white"
@@ -148,7 +161,7 @@ export default function AdminSales() {
                         }`}
                       >
                         <Check size={13} />
-                        {busyId === order.id ? "Processando..." : actionLabel}
+                        {advancingId === order.id ? "Atualizando..." : actionLabel}
                       </button>
                     )}
                   </td>

@@ -11,7 +11,7 @@ import {
 } from "../services/adapters";
 import type { Order, OrderStatus } from "../types/order";
 import type { StockItem } from "../types/stock";
-import type { ActionResult } from "./userShopData";
+import type { ActionResult } from "./useShopData";
 
 const errorMessage = (e: unknown) => (e instanceof ApiError ? e.message : "Algo deu errado. Tente novamente.");
 

@@ -8,6 +8,8 @@ import { matchesSearch } from "../../components/Search";
 import ProductEditModal from "../../components/ProductEditModal";
 import { makePreview, revokePreview, validateImageFile } from "../../services/imageFile";
 import { COLOR_NAMES } from "../../data/colors";
+import { useShop } from "../../components/ShopContext";
+import { normalizeText } from "../../components/Search";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -20,7 +22,7 @@ const CATEGORY_OPTIONS = ["Top", "Shorts", "Macaquinho", "Cropped", "Leggings"];
 type NewItemDraft = {
   sku: string;
   product: string;
-  variation: string;
+  variation: string; // "Cor / Tamanho"
   category: StockCategory;
   price: string;
   stock: string;
@@ -30,7 +32,7 @@ const EMPTY_DRAFT: NewItemDraft = {
   sku: "",
   product: "",
   variation: "",
-  category: CATEGORY_OPTIONS[0],
+  category: "Top",
   price: "",
   stock: "",
 };
@@ -40,15 +42,15 @@ const CELL_INPUT_CLASS =
 
 // Página de estoque que gerencia o inventário com busca de produtos, remoção e edição inline da quantidade em estoque
 export default function AdminStock() {
-  // Estoque global: o mesmo que é baixado quando um pagamento é confirmado em Vendas (agora vindo da API)
+  const { products } = useShop();
   const { stock, loading, error, reload, addStockItem, setStockQuantity, removeStockItem } = useOrders();
   const [search, setSearch] = useState("");
 
-  // Edição do estoque de uma linha existente
   const [editingSku, setEditingSku] = useState<string | null>(null);
   const [draftValue, setDraftValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [rowError, setRowError] = useState("");
 
-  // Linha nova
   const [newItem, setNewItem] = useState<NewItemDraft | null>(null);
   const [newItemError, setNewItemError] = useState("");
   const [newImage, setNewImage] = useState<File | null>(null); // imagem do produto novo
@@ -68,7 +70,7 @@ export default function AdminStock() {
 
   function startEditing(item: StockItem) {
     setNewItem(null);
-    setActionError("");
+    setRowError("");
     setEditingSku(item.sku);
     setDraftValue(String(item.stock));
   }
@@ -76,35 +78,31 @@ export default function AdminStock() {
   function cancelEditing() {
     setEditingSku(null);
     setDraftValue("");
+    setRowError("");
   }
 
-  async function saveEditing(sku: string) {
-    const newStock = Number(draftValue);
-    if (draftValue.trim() === "" || !Number.isInteger(newStock) || newStock < 0) {
-      setActionError("Informe um estoque válido (número inteiro, 0 ou mais).");
+  async function saveEditing(item: StockItem) {
+    const value = Number(draftValue);
+    if (draftValue === "" || !Number.isInteger(value) || value < 0) {
+      setRowError("O estoque deve ser um número inteiro maior ou igual a zero.");
       return;
     }
-
-    setSaving(true);
-    setActionError("");
-    const result = await setStockQuantity(sku, newStock);
-    setSaving(false);
-
+    setBusy(true);
+    const result = await setStockQuantity(item.sku, value);
+    setBusy(false);
     if (result.ok) cancelEditing();
-    else setActionError(result.message ?? "Não foi possível salvar o estoque.");
+    else setRowError(result.message ?? "Não foi possível salvar o estoque.");
   }
 
-  async function removeItem(sku: string) {
-    if (!window.confirm("Excluir esta variação do estoque? Esta ação não pode ser desfeita.")) return;
-
-    setActionError("");
-    setNotice("");
-    const result = await removeStockItem(sku);
-    if (result.ok) setNotice(result.message ?? "Variação excluída.");
-    else setActionError(result.message ?? "Não foi possível excluir a variação.");
+  async function removeItem(item: StockItem) {
+    if (!window.confirm(`Excluir a variação ${item.sku}? Essa ação não pode ser desfeita.`)) return;
+    setRowError("");
+    setBusy(true);
+    const result = await removeStockItem(item.sku);
+    setBusy(false);
+    if (!result.ok) setRowError(result.message ?? "Não foi possível excluir.");
   }
 
-  // Clicar em "Novo Produto" abre uma linha em branco no topo da tabela
   function startNewItem() {
     cancelEditing();
     setActionError("");
@@ -140,7 +138,7 @@ export default function AdminStock() {
       return;
     }
 
-    setNewItemError("");
+    setNewIStemError("");
     setNewImage(file);
     setNewImagePreview(makePreview(file));
   }
@@ -154,34 +152,26 @@ export default function AdminStock() {
     if (!newItem) return;
 
     const sku = newItem.sku.trim().toUpperCase();
-    const product = newItem.product.trim();
-    const price = Number(newItem.price.replace(",", "."));
     const quantity = Number(newItem.stock);
     const [color, size] = newItem.variation.split("/").map((part) => part.trim());
 
-    // Validações
-    if (!sku || !product) {
-      setNewItemError("Preencha o SKU e o nome do produto.");
-      return;
-    }
-    if (!color || !size) {
-      setNewItemError('Informe a variação no formato "Cor / Tamanho" (ex.: Preto / M).');
-      return;
-    }
+    // O produto precisa existir (cadastrado na tela Produtos)
+    const product = products.find((p) => normalizeText(p.name) === normalizeText(newItem.product));
 
-    // A cor precisa existir na paleta da loja (data/colors.ts), senão a bolinha de cor não aparece no site
-    const validColors = [...new Set(Object.values(COLOR_NAMES))];
-    const knownColor = validColors.find((c) => c.toLowerCase() === color.toLowerCase());
-    if (!knownColor) {
-      setNewItemError(`Cor desconhecida. Use uma destas: ${validColors.join(", ")}.`);
+    if (!sku) {
+      setNewItemError("Informe o SKU.");
+      return;
+    }
+    if (!product) {
+      setNewItemError("Produto não encontrado. Cadastre-o primeiro na tela Produtos.");
+      return;
+    }
+    if (!/^[^/]+\/[^/]+$/.test(newItem.variation.trim())) {
+      setNewItemError('Informe a variação no formato "Cor / Tamanho" (ex.: Preto / M).');
       return;
     }
     if (stock.some((item) => item.sku === sku)) {
       setNewItemError("Já existe um item com esse SKU.");
-      return;
-    }
-    if (newItem.price === "" || Number.isNaN(price) || price <= 0) {
-      setNewItemError("Informe um preço maior que zero.");
       return;
     }
     if (newItem.stock === "" || !Number.isInteger(quantity) || quantity < 0) {
@@ -191,21 +181,22 @@ export default function AdminStock() {
 
     const created: StockItem = {
       sku,
-      product,
-      variation: `${knownColor} / ${size}`,
-      category: newItem.category,
-      price,
+      productId: product.id,
+      product: product.name,
+      variation: newItem.variation.trim(),
+      category: product.category,
+      price: product.price,
       stock: quantity,
     };
 
-    setSaving(true);
-    setNewItemError("");
-    const result = await addStockItem(created, newImage);
-    setSaving(false);
+    setBusy(true);
+    const result = await addStockItem(created);
+    setBusy(false);
 
     if (result.ok) cancelNewItem();
-    else setNewItemError(result.message ?? "Não foi possível cadastrar o item.");
+    else setNewItemError(result.message ?? "Não foi possível cadastrar.");
   }
+
 
   const filteredStock = stock.filter((item) =>
     matchesSearch(search, item.sku, item.product, item.variation, item.category)
@@ -216,16 +207,14 @@ export default function AdminStock() {
       <AdminTopBar title="Estoque" />
 
       {error && (
-        <div className="mb-5 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           <span>{error}</span>
-          <button onClick={() => reload()} className="underline text-xs">
-            Tentar novamente
-          </button>
+          <button onClick={() => reload()} className="underline">Tentar novamente</button>
         </div>
       )}
-
-      {actionError && <p className="mb-5 text-sm rounded-lg px-4 py-3 bg-red-50 text-red-700">{actionError}</p>}
-      {notice && <p className="mb-5 text-sm rounded-lg px-4 py-3 bg-emerald-50 text-emerald-700">{notice}</p>}
+      {rowError && (
+        <p className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{rowError}</p>
+      )}
 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
@@ -246,7 +235,7 @@ export default function AdminStock() {
               className="flex items-center gap-1.5 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-xs font-medium px-4 py-2 rounded-full whitespace-nowrap"
             >
               <Plus size={14} />
-              Novo Produto
+              Nova Variação
             </button>
           </div>
         </div>
@@ -278,9 +267,10 @@ export default function AdminStock() {
                   </td>
                   <td className="px-4 py-3">
                     <input
+                      list="product-names"
                       value={newItem.product}
                       onChange={(e) => updateDraft("product", e.target.value)}
-                      placeholder="Nome do produto"
+                      placeholder="Escolha o produto"
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
@@ -292,19 +282,7 @@ export default function AdminStock() {
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={newItem.category}
-                      onChange={(e) => updateDraft("category", e.target.value as StockCategory)}
-                      className={CELL_INPUT_CLASS}
-                    >
-                      {CATEGORY_OPTIONS.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Herdados do produto</td>
                   <td className="px-4 py-3">
                     <input
                       type="number"
@@ -316,30 +294,21 @@ export default function AdminStock() {
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      min="0"
-                      value={newItem.stock}
-                      onChange={(e) => updateDraft("stock", e.target.value)}
-                      placeholder="0"
-                      className={CELL_INPUT_CLASS}
-                    />
-                  </td>
+                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Herdados do produto</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={saveNewItem}
-                        disabled={saving}
-                        className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60 disabled:cursor-not-allowed"
+                        disabled={busy}
+                        className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60"
                       >
                         <Check size={12} />
-                        {saving ? "Salvando..." : "Salvar"}
+                        {busy ? "Salvando..." : "Salvar"}
                       </button>
                       <button
                         onClick={cancelNewItem}
-                        disabled={saving}
-                        className="flex items-center gap-1 border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60"
+                        disabled={busy}
+                        className="flex items-center gap-1 border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-1.5 rounded-full"
                       >
                         <X size={12} />
                         Cancelar
@@ -396,11 +365,11 @@ export default function AdminStock() {
                     </span>
                   </td>
                   <td className="px-6 py-4">{formatPrice(item.price)}</td>
-
                   <td className="px-6 py-4">
                     {isEditing ? (
                       <input
                         type="number"
+                        min="0"
                         value={draftValue}
                         onChange={(e) => setDraftValue(e.target.value)}
                         className="w-16 border border-neutral-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-[#8b1538]"
@@ -414,25 +383,26 @@ export default function AdminStock() {
                         </span>
                       </span>
                     ) : (
-                      <span className="text-amber-600 font-medium">{item.stock}</span>
+                      <span className={`font-medium ${item.stock <= 3 ? "text-amber-600" : "text-emerald-600"}`}>
+                        {item.stock}
+                      </span>
                     )}
                   </td>
-
                   <td className="px-6 py-4">
                     {isEditing ? (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => saveEditing(item.sku)}
-                          disabled={saving}
-                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60 disabled:cursor-not-allowed"
+                          onClick={() => saveEditing(item)}
+                          disabled={busy}
+                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60"
                         >
                           <Check size={12} />
-                          {saving ? "Salvando..." : "Salvar"}
+                          {busy ? "Salvando..." : "Salvar"}
                         </button>
                         <button
                           onClick={cancelEditing}
-                          disabled={saving}
-                          className="flex items-center gap-1 border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60"
+                          disabled={busy}
+                          className="flex items-center gap-1 border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-1.5 rounded-full"
                         >
                           <X size={12} />
                           Cancelar
@@ -449,19 +419,10 @@ export default function AdminStock() {
                           <Pencil size={15} />
                         </button>
                         <button
-                          onClick={() => item.productId && setEditingProductId(item.productId)}
-                          disabled={!item.productId}
-                          aria-label="Editar produto"
-                          title="Editar produto (nome, preço, descrição e imagem)"
-                          className="text-neutral-500 hover:text-[#8b1538] disabled:opacity-40"
-                        >
-                          <Package size={15} />
-                        </button>
-                        <button
-                          onClick={() => removeItem(item.sku)}
-                          aria-label="Excluir variação"
-                          title="Excluir variação"
-                          className="text-neutral-400 hover:text-red-500"
+                          onClick={() => removeItem(item)}
+                          disabled={busy}
+                          aria-label="Excluir"
+                          className="text-neutral-400 hover:text-red-500 disabled:opacity-50"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -473,11 +434,17 @@ export default function AdminStock() {
             })}
           </tbody>
         </table>
+        <datalist id="product-names">
+          {products.map((p) => (
+            <option key={p.id} value={p.name} />
+          ))}
+        </datalist>
 
-        {filteredStock.length === 0 && !newItem && (
-          <p className="text-sm text-neutral-400 text-center py-8">
-            {loading ? "Carregando..." : "Nenhum item encontrado."}
-          </p>
+        {loading && stock.length === 0 && (
+          <p className="text-sm text-neutral-500 text-center py-8">Carregando estoque...</p>
+        )}
+        {!loading && filteredStock.length === 0 && (
+          <p className="text-sm text-neutral-400 text-center py-8">Nenhum item encontrado.</p>
         )}
       </div>
 

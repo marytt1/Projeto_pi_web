@@ -46,13 +46,12 @@ export default function AdminOverview() {
       <AdminTopBar title="Visão Geral" />
 
       {error && (
-        <div className="mb-5 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
           <span>{error}</span>
-          <button onClick={() => reload()} className="underline text-xs">
-            Tentar novamente
-          </button>
+          <button onClick={() => reload()} className="underline">Tentar novamente</button>
         </div>
       )}
+      {loading && !dashboard && <p className="mb-5 text-sm text-neutral-500">Carregando painel...</p>}
 
       <div className="grid sm:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-2xl shadow p-5">
@@ -141,7 +140,7 @@ export default function AdminOverview() {
                   <StatusBadge status={order.status} />
                 </td>
               </tr>
-            ))}
+            ))} 
           </tbody>
         </table>
 

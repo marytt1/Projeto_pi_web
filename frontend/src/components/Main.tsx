@@ -19,6 +19,8 @@ import type { SizeResult } from "../types/size";
 import { INSTAGRAM_POSTS } from "../data/instagram";
 import { STORE_LINKS } from "../data/links";
 
+import { ApiError, sizeGuide as sizeGuideApi } from "../services/api";
+
 const HIDE_SCROLLBAR =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
@@ -136,6 +138,7 @@ function CategoryShowcase() {
 const FEATURED_LIMIT = 6;
 
 function FeaturedProducts() {
+  const { products, loadingProducts, productsError, reloadProducts } = useShop();
   const [active, setActive] = useState<(typeof FILTERS)[number]>("Todos");
 
   const { products, loadingProducts, productsError, reloadProducts } = useShop();
@@ -148,7 +151,7 @@ function FeaturedProducts() {
   return (
     <Section
       id="produtos"
-      className="scroll-mt-32" // evita o título ficar escondido atrás do Header fixo
+      className="scroll-mt-32"
       eyebrow="Nossa Coleção Pilates"
       title="Produtos em Destaque"
       align="start"
@@ -181,13 +184,13 @@ function FeaturedProducts() {
 
       {loadingProducts && products.length === 0 ? (
         <p className="text-sm text-neutral-400 text-center py-16">Carregando produtos...</p>
-      ) : featured.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <p className="text-sm text-neutral-400 text-center py-16">
           {products.length === 0 ? "Nenhum produto cadastrado ainda." : "Nenhum produto nesta categoria."}
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-          {featured.map((product) => (
+          {filtered.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>
@@ -261,14 +264,13 @@ function SizeGuide() {
   // Resultado do cálculo (null = ainda não calculou) e mensagem de erro
   const [result, setResult] = useState<SizeResult | null>(null);
   const [sizeError, setSizeError] = useState("");
+  const [calculating, setCalculating] = useState(false);
 
-  // Roda quando clica em "Calcular Meu Tamanho"
-  function handleCalculate() {
+  async function handleCalculate() {
     const bust = Number(measurements.bust);
     const waist = Number(measurements.waist);
     const hip = Number(measurements.hip);
 
-    // As três medidas são obrigatórias e precisam ser números positivos
     if (![bust, waist, hip].every((value) => value > 0)) {
       setResult(null);
       setSizeError("Preencha busto, cintura e quadril para calcular.");
@@ -276,7 +278,26 @@ function SizeGuide() {
     }
 
     setSizeError("");
-    setResult(calculateSize(bust, waist, hip));
+    setCalculating(true);
+    try {
+      // O servidor calcula (e, se a cliente estiver logada, guarda as medidas no perfil)
+      const data = (await sizeGuideApi.calculate(bust, waist, hip)) as SizeResult;
+      setResult(
+        data.status === "ok"
+          ? { status: "ok", size: data.size, details: data.details, mixed: data.mixed }
+          : { status: "above" }
+      );
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 0) {
+        // Sem conexão com a API: usa o cálculo local
+        setResult(calculateSize(bust, waist, hip));
+      } else {
+        setResult(null);
+        setSizeError(e instanceof ApiError ? e.message : "Não foi possível calcular. Tente novamente.");
+      }
+    } finally {
+      setCalculating(false);
+    }
   }
 
   return (
@@ -321,12 +342,12 @@ function SizeGuide() {
 
           <button
             onClick={handleCalculate}
-            className="mt-8 w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full"
+            disabled={calculating}
+            className="mt-8 w-full bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-sm font-medium py-3 rounded-full disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Calcular Meu Tamanho
+            {calculating ? "Calculando..." : "Calcular Meu Tamanho"}
           </button>
 
-          
           {sizeError && <p className="text-xs text-red-600 mt-3 text-center">{sizeError}</p>}
 
           
