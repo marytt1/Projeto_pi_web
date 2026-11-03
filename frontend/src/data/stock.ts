@@ -1,5 +1,5 @@
 import { PRODUCTS } from "./products";
-import { getColorName, getColorCode } from "./colors";
+import { getColorName } from "./colors";
 import type { StockItem } from "../types/stock";
 
 // Simulação do estoque que é gerado a partir dos produtos da loja: uma linha para cada combinação de produto + cor + tamanho
@@ -22,7 +22,7 @@ function buildStock(): StockItem[] {
           : 4 + ((counter * 7) % 9);
 
         rows.push({
-          sku: `${productCode}-${getColorCode(color)}-${size}`,
+          sku: `${productCode}-${getColorName(color)}-${size}`,
           productId: product.id,
           product: product.name,
           variation: `${getColorName(color)} / ${size}`,
