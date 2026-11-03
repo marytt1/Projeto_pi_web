@@ -10,13 +10,15 @@ export type ProductBadge = {
   tone: ProductBadgeTone;
 };
 
+// uma variação real do banco (cor + tamanho). O carrinho precisa do id dela.
 export type ProductVariant = {
-  id: string; 
+  id: string; // id da variação na API (vira o variantId do carrinho)
   size: string;
   colorName: string;
   stock: number;
 };
 
+// cor com nome (usado no carrinho) e código hex (usado na bolinha do card)
 export type ColorOption = {
   name: string;
   hex: string;
@@ -40,6 +42,7 @@ export type Product = {
   colors: string[]; // códigos hex das cores (continua igual)
   sizes: string[];
   image: string;
+  description?: string; // texto que o admin escreve em "Editar produto"
   soldOut?: boolean;
   colorOptions?: ColorOption[];
   description?: string;

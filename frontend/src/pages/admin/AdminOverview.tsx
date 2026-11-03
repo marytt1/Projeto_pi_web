@@ -1,29 +1,45 @@
-import { useState } from "react";
-import { TrendingUp, Package, AlertTriangle, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router";
+import { TrendingUp, Package, AlertTriangle, Search, ChevronRight } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
 import { useOrders } from "../../components/OrdersContext";
 import { matchesSearch } from "../../components/Search";
-import { summarizeItems } from "../../components/Orders";
+import { sortNewestFirst, summarizeItems } from "../../components/Orders";
+import Pagination from "../../components/Pagination";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+const PAGE_SIZE = 5; // pedidos por página na lista
+
 // Página que exibe o painel principal com métricas resumidas (vendas, pendências, alertas) e os últimos pedidos realizados
 export default function AdminOverview() {
-  const { dashboard, loading, error, reload } = useOrders();
+  const { orders, dashboard, loading, error, reload } = useOrders();
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
+  // Ao abrir a tela, busca os dados mais recentes na API
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // Os números dos cards já vêm calculados pela API
   const salesToday = dashboard?.salesToday.total ?? 0;
   const salesCount = dashboard?.salesToday.orders ?? 0;
   const pendingOrders = dashboard?.pendingOrders ?? 0;
   const stockAlerts = dashboard?.stockAlerts.count ?? 0;
   const stockLimit = dashboard?.stockAlerts.limit ?? 3;
 
-  const recentOrders = (dashboard?.latestOrders ?? []).filter((o) =>
+  const matchingOrders = sortNewestFirst(orders).filter((o) =>
     matchesSearch(search, o.id, o.customerName, o.customerEmail, summarizeItems(o.items), o.status)
   );
+
+  // Paginação: 5 pedidos por vez, com setinhas para ver os outros
+  const pageCount = Math.max(1, Math.ceil(matchingOrders.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const recentOrders = matchingOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div>
@@ -76,14 +92,23 @@ export default function AdminOverview() {
 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
-          <h3 className="font-medium">Últimos Pedidos</h3>
+          <div className="flex items-center gap-4">
+            <h3 className="font-medium">Últimos Pedidos</h3>
+            <Link to="/admin/vendas" className="flex items-center gap-1 text-xs text-[#8b1538] hover:underline">
+              Ver todas as vendas
+              <ChevronRight size={14} />
+            </Link>
+          </div>
           <div className="flex items-center gap-2 bg-white border border-neutral-200 rounded-full px-3 py-1.5 w-56">
             <Search size={14} className="text-neutral-400" />
             <input
               type="text"
               placeholder="Buscar pedido.."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
               className="text-sm outline-none w-full placeholder:text-neutral-400"
             />
           </div>
@@ -115,11 +140,16 @@ export default function AdminOverview() {
                   <StatusBadge status={order.status} />
                 </td>
               </tr>
-            ))}
+            ))} 
           </tbody>
         </table>
+
+        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={matchingOrders.length} onChange={setPage} />
+
         {recentOrders.length === 0 && (
-          <p className="text-sm text-neutral-400 text-center py-8">Nenhum pedido encontrado.</p>
+          <p className="text-sm text-neutral-400 text-center py-8">
+            {loading ? "Carregando..." : "Nenhum pedido encontrado."}
+          </p>
         )}
       </div>
     </div>

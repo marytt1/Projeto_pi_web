@@ -28,7 +28,7 @@ export default function CatalogProductCard({
           </span>
         )}
 
-        
+
         <button
           onClick={() => onToggleFavorite?.(product.id)}
           aria-label="Favoritar"
@@ -40,11 +40,21 @@ export default function CatalogProductCard({
           />
         </button>
 
-        <img
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-neutral-300">Sem imagem</div>
+        )}
+
+        {product.soldOut && (
+          <div className="absolute bottom-0 inset-x-0 bg-white/90 text-center text-xs py-2 text-neutral-500">
+            Esgotado
+          </div>
+        )}
       </div>
 
       <div className="pt-3">

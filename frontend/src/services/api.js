@@ -1,5 +1,4 @@
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
-
 const PATHS = {
     users: '/users',
     products: '/products',
@@ -46,8 +45,8 @@ export class ApiError extends Error {
 
 async function request(path, { method = 'GET', body, query, auth = true } = {}) {
     const headers = {};
+    // FormData (envio de arquivo): o navegador define o Content-Type sozinho, com o "boundary"
     const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
-  
     if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
 
     const token = session.getToken();
@@ -71,6 +70,7 @@ async function request(path, { method = 'GET', body, query, auth = true } = {}) 
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+        // Token vencido ou inválido: limpa a sessão e avisa o app (ouça "auth:expired" para ir ao login)
         if (res.status === 401 && token) {
             session.clear();
             window.dispatchEvent(new Event('auth:expired'));
@@ -94,11 +94,12 @@ export const auth = {
         request(`${PATHS.users}/register`, { method: 'POST', body: { name, email, password }, auth: false }),
     logout: () => session.clear(),
     isLoggedIn: () => Boolean(session.getToken()),
-    isAdmin: () => Boolean(session.getUser() && session.getUser().isAdmin), 
+    isAdmin: () => Boolean(session.getUser() && session.getUser().isAdmin), // só para esconder menus; a API é quem barra
     forgotPassword: (email) =>
         request(`${PATHS.users}/forgot-password`, { method: 'POST', body: { email }, auth: false }),
     resetPassword: (token, newPassword) =>
         request(`${PATHS.users}/reset-password/${token}`, { method: 'POST', body: { newPassword }, auth: false }),
+    // Usuário logado troca a própria senha (rota nova: veja userController.changePassword.js)
     changePassword: (currentPassword, newPassword) =>
         request(`${PATHS.users}/change-password`, { method: 'PATCH', body: { currentPassword, newPassword } }),
 };
@@ -139,7 +140,6 @@ export const cart = {
     },
     remove: (variantId) => writeCart(readCart().filter((i) => i.variantId !== variantId)),
     clear: () => writeCart([]),
-
     quote() {
         const items = readCart();
         if (items.length === 0) return Promise.resolve({ items: [], subtotal: 0, canCheckout: false });
@@ -149,6 +149,7 @@ export const cart = {
 
 // pedido (exige login)
 export const orders = {
+    // Cria o pedido com o carrinho atual e esvazia o carrinho.
     async checkout() {
         const data = await request(PATHS.orders, { method: 'POST', body: { items: readCart() } });
         writeCart([]);
@@ -162,7 +163,7 @@ export const favorites = {
     toggle: (productId) => request(PATHS.favorites, { method: 'POST', body: { ProductId: productId } }), // { favorited: true|false }
 };
 
-// painel admin (exige token de admin)
+//painel admin (exige token de admin)
 export const admin = {
     // Dashboard (Visão Geral)
     dashboard: () => request(`${PATHS.admin}/dashboard`),
@@ -193,6 +194,13 @@ export const admin = {
     createVariant: (data) => request(PATHS.variants, { method: 'POST', body: data }), // { sku, size, color, stock, ProductId }
     updateVariant: (id, data) => request(`${PATHS.variants}/${id}`, { method: 'PUT', body: data }),
     deleteVariant: (id) => request(`${PATHS.variants}/${id}`, { method: 'DELETE' }),
+
+    // Envia uma imagem (JPG, PNG ou WebP, até 3 MB)
+    uploadImage(file) {
+        const form = new FormData();
+        form.append('image', file);
+        return request(`${PATHS.admin}/upload-image`, { method: 'POST', body: form });
+    },
 };
 
 // Calculadora de tamanho

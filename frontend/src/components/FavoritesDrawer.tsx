@@ -1,5 +1,7 @@
+import { Link } from "react-router";
 import { X, Heart } from "lucide-react";
 import type { FavoriteItem } from "../types/favorite";
+import { colorHex } from "../services/adapters";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -11,7 +13,7 @@ type FavoritesDrawerProps = {
   onRemove: (id: string) => void;
 };
 
-// Componente do Painel flutuante de favoritos que exibe os produtos salvos e permite removê-los da lista
+// Componente do Painel flutuante de favoritos que exibe os produtos salvos e permite removê-los da lista.
 export default function FavoritesDrawer({ items, onClose, onRemove }: FavoritesDrawerProps) {
   return (
     <div className="absolute right-0 top-full mt-2 w-[380px] bg-white rounded-2xl shadow-xl border border-neutral-100 z-50">
@@ -30,12 +32,36 @@ export default function FavoritesDrawer({ items, onClose, onRemove }: FavoritesD
         ) : (
           items.map((item) => (
             <div key={item.id} className="flex items-center gap-3 px-6 py-4">
-              <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-[#3a3a3a] truncate">{item.name}</p>
-                {item.colors.length > 0 && (
-                  <p className="text-xs text-neutral-400">{item.colors.join(", ")}</p>
+              <Link to={`/produto/${item.id}`} onClick={onClose} className="shrink-0">
+                {item.image ? (
+                  <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover" />
+                ) : (
+                  <span className="block w-14 h-14 rounded-lg bg-neutral-100" />
                 )}
+              </Link>
+
+              <div className="flex-1 min-w-0">
+                <Link
+                  to={`/produto/${item.id}`}
+                  onClick={onClose}
+                  className="block text-sm text-[#3a3a3a] truncate hover:text-[#8b1538]"
+                >
+                  {item.name}
+                </Link>
+
+                {item.colors.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1">
+                    {item.colors.map((color) => (
+                      <span
+                        key={color}
+                        title={color}
+                        className="w-3 h-3 rounded-full border border-black/10"
+                        style={{ backgroundColor: colorHex(color) }}
+                      />
+                    ))}
+                  </div>
+                )}
+
                 <p className="text-sm font-semibold text-[#8b1538] mt-0.5">{formatPrice(item.price)}</p>
               </div>
               <button

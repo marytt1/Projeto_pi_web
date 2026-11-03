@@ -1,12 +1,15 @@
 import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { matchesSearch } from "../components/Search";
+import { matchesSearch, normalizeText } from "../components/Search";
 import CatalogProductCard from "../components/CatalogProductCard";
 import { useShop } from "../components/ShopContext";
 import { compareSizes } from "../services/adapters";
+import { getColorName } from "../data/colors";
 import type { ProductCategory } from "../types/product";
 
-// Página de catálogo com filtros montados a partir dos produtos cadastrados
+const CATEGORY_OPTIONS: ProductCategory[] = ["Cropped", "Leggings", "Macaquinho", "Shorts", "Top"];
+
+// Página de catálogo com barra lateral de filtros interativos (categoria, tamanho, cor e preço) e listagem dinâmica de produtos
 export default function CatalogPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -20,10 +23,12 @@ export default function CatalogPage() {
     () => [...new Set(products.map((p) => p.category))].sort(),
     [products]
   );
+
   const sizeOptions = useMemo(
     () => [...new Set(products.flatMap((p) => p.sizes))].sort(compareSizes),
     [products]
   );
+
   const colorFilterOptions = useMemo(() => {
     const byName = new Map<string, string>();
     products.forEach((p) =>
@@ -34,8 +39,12 @@ export default function CatalogPage() {
     return [...byName].map(([name, hex]) => ({ name, hex })).sort((a, b) => a.name.localeCompare(b.name));
   }, [products]);
 
+  // Lê o ?categoria= da URL sem diferenciar maiúsculas, minúsculas e acentos
   function paramToCategories(): ProductCategory[] {
-    return categoryParam ? [categoryParam] : [];
+    if (!categoryParam) return [];
+    const match = CATEGORY_OPTIONS.find((option) => normalizeText(option) === normalizeText(categoryParam));
+    return match ? [match] : [];
+  }
   }
 
   const [selectedCategories, setSelectedCategories] = useState<ProductCategory[]>(paramToCategories);
@@ -130,25 +139,42 @@ export default function CatalogPage() {
             </div>
           </div>
 
-          <div>
-            <h3 className="font-medium mb-3">Preço</h3>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                placeholder="Min"
-                value={minPrice}
-                onChange={(e) => setMinPrice(e.target.value)}
-                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b1538]"
-              />
-              <span className="text-neutral-300">-</span>
-              <input
-                type="number"
-                placeholder="Max"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(e.target.value)}
-                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b1538]"
-              />
+            {productsError && (
+            <div className="mb-5 flex items-center justify-between bg-red-50 text-red-700 text-sm rounded-lg px-4 py-3">
+              <span>{productsError}</span>
+              <button onClick={() => reloadProducts()} className="underline text-xs">
+                Tentar novamente
+              </button>
             </div>
+          )}
+
+          {searchTerm && (
+            <p className="text-sm text-neutral-500 mb-4">
+              Resultados para <strong className="text-[#8b1538]">"{searchTerm}"</strong>{" "}
+            </p>
+          )}
+
+          {loadingProducts && products.length === 0 ? (
+            <p className="text-sm text-neutral-400 text-center py-20">Carregando produtos...</p>
+          ) : filteredProducts.length === 0 ? (
+            <p className="text-sm text-neutral-400 text-center py-20">
+              {products.length === 0
+                ? "Nenhum produto cadastrado ainda."
+                : "Nenhum produto encontrado com esses filtros."}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10">
+              {filteredProducts.map((product) => (
+                <CatalogProductCard
+                  key={product.id}
+                  product={product}
+                  isFavorite={isFavorite(product.id)}
+                  onToggleFavorite={() => toggleFavorite(product)}
+                  onViewDetails={(id) => navigate(`/produto/${id}`)}
+                />
+              ))}
+            </div>
+          )}
           </div>
         </aside>
 

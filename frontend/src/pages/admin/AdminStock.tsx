@@ -1,15 +1,22 @@
-import { useState } from "react";
-import { Search, Plus, Pencil, Trash2, Check, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
+import { Search, Plus, Pencil, Trash2, Check, X, Package, ImagePlus } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import { useOrders } from "../../components/OrdersContext";
 import type { StockItem, StockCategory } from "../../types/stock";
 import { matchesSearch } from "../../components/Search";
+import ProductEditModal from "../../components/ProductEditModal";
+import { makePreview, revokePreview, validateImageFile } from "../../services/imageFile";
+import { COLOR_NAMES } from "../../data/colors";
 import { useShop } from "../../components/ShopContext";
 import { normalizeText } from "../../components/Search";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+// Categorias do catálogo da loja
+const CATEGORY_OPTIONS = ["Top", "Shorts", "Macaquinho", "Cropped", "Leggings"];
 
 // Rascunho da linha "Novo Produto"
 type NewItemDraft = {
@@ -46,6 +53,20 @@ export default function AdminStock() {
 
   const [newItem, setNewItem] = useState<NewItemDraft | null>(null);
   const [newItemError, setNewItemError] = useState("");
+  const [newImage, setNewImage] = useState<File | null>(null); // imagem do produto novo
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+
+  // Produto aberto na janela "Editar produto" (preço, descrição e imagem)
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+
+  const [saving, setSaving] = useState(false); // true enquanto a API responde
+  const [actionError, setActionError] = useState(""); // erro de editar ou excluir
+  const [notice, setNotice] = useState(""); // aviso de sucesso ao excluir
+
+  // Ao abrir a tela, busca o estoque mais recente na API
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   function startEditing(item: StockItem) {
     setNewItem(null);
@@ -84,15 +105,45 @@ export default function AdminStock() {
 
   function startNewItem() {
     cancelEditing();
+    setActionError("");
     setNewItem({ ...EMPTY_DRAFT });
     setNewItemError("");
   }
 
   function cancelNewItem() {
+    revokePreview(newImagePreview);
+    setNewImage(null);
+    setNewImagePreview(null);
     setNewItem(null);
     setNewItemError("");
   }
 
+  // Imagem escolhida na linha "Novo Produto"
+  function handleNewImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    revokePreview(newImagePreview);
+
+    if (!file) {
+      setNewImage(null);
+      setNewImagePreview(null);
+      return;
+    }
+
+    const problem = validateImageFile(file);
+    if (problem) {
+      setNewItemError(problem);
+      event.target.value = "";
+      setNewImage(null);
+      setNewImagePreview(null);
+      return;
+    }
+
+    setNewIStemError("");
+    setNewImage(file);
+    setNewImagePreview(makePreview(file));
+  }
+
+  // Atualiza um campo do rascunho, mantendo os outros
   function updateDraft<K extends keyof NewItemDraft>(field: K, value: NewItemDraft[K]) {
     setNewItem((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
@@ -102,6 +153,7 @@ export default function AdminStock() {
 
     const sku = newItem.sku.trim().toUpperCase();
     const quantity = Number(newItem.stock);
+    const [color, size] = newItem.variation.split("/").map((part) => part.trim());
 
     // O produto precisa existir (cadastrado na tela Produtos)
     const product = products.find((p) => normalizeText(p.name) === normalizeText(newItem.product));
@@ -264,6 +316,31 @@ export default function AdminStock() {
                     </div>
                   </td>
                 </tr>
+
+                <tr className="bg-[#faf1f0]">
+                  <td colSpan={7} className="px-4 pb-3">
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 text-xs text-neutral-600">
+                        <ImagePlus size={15} className="text-[#8b1538]" />
+                        Imagem do produto (opcional)
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleNewImage}
+                          className="text-xs"
+                        />
+                      </label>
+                      {newImagePreview && (
+                        <img src={newImagePreview} alt="Prévia da imagem" className="w-12 h-12 rounded-lg object-cover" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-neutral-400 mt-1">
+                      Só é usada quando o produto é novo. Para trocar a imagem de um produto que já existe, use o botão
+                      “Editar produto” na linha dele.
+                    </p>
+                  </td>
+                </tr>
+
                 {newItemError && (
                   <tr className="bg-[#faf1f0]">
                     <td colSpan={7} className="px-6 pb-3 text-xs text-red-600">
@@ -335,7 +412,8 @@ export default function AdminStock() {
                       <div className="flex items-center gap-3">
                         <button
                           onClick={() => startEditing(item)}
-                          aria-label="Editar"
+                          aria-label="Editar estoque"
+                          title="Editar estoque"
                           className="text-[#8b1538] hover:text-[#71102d]"
                         >
                           <Pencil size={15} />
@@ -369,6 +447,14 @@ export default function AdminStock() {
           <p className="text-sm text-neutral-400 text-center py-8">Nenhum item encontrado.</p>
         )}
       </div>
+
+      {editingProductId && (
+        <ProductEditModal
+          productId={editingProductId}
+          onClose={() => setEditingProductId(null)}
+          onSaved={(message) => setNotice(message)}
+        />
+      )}
     </div>
   );
 }

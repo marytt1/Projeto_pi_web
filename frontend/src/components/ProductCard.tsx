@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { Product, ProductBadgeTone } from "../types/product";
+import { isCombinationAvailable, pickDefaultSelection } from "../services/adapters";
+import { getColorName } from "../data/colors";
 import { useShop } from "./ShopContext";
 
 type ProductCardProps = {
@@ -19,15 +21,29 @@ function formatPrice(value: number) {
 
 // Componente do Card de produto em destaque que exibe foto, selo personalizado, preço com desconto, opções de cores, tamanhos e botão de compra
 export default function ProductCard({ product }: ProductCardProps) {
-  
+
   const { addToCart } = useShop();
 
-  const [selectedColor, setSelectedColor] = useState(product.colors[0]);
-  const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
+  // Começa na primeira combinação de cor e tamanho que tem estoque
+  const initial = pickDefaultSelection(product);
+  const [selectedColor, setSelectedColor] = useState(initial.color);
+  const [selectedSize, setSelectedSize] = useState(initial.size);
   const [added, setAdded] = useState(false);
 
-  const [notice, setNotice] = useState("");
+  // false quando essa cor + tamanho não existem ou estão sem estoque
+  const available = isCombinationAvailable(product, selectedSize, selectedColor);
 
+  // Ao trocar a cor, se o tamanho escolhido não existe nela, vai para o primeiro tamanho que existe
+  function handleColorChange(color: string) {
+    setSelectedColor(color);
+    if (!isCombinationAvailable(product, selectedSize, color)) {
+      const firstSize = product.sizes.find((size) => isCombinationAvailable(product, size, color));
+      if (firstSize) setSelectedSize(firstSize);
+    }
+  }
+
+  const [notice, setNotice] = useState("");
+        
   function handleAddToCart() {
     setNotice("");
     if (!addToCart(product, selectedSize, selectedColor)) {
@@ -37,6 +53,8 @@ export default function ProductCard({ product }: ProductCardProps) {
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }
+
+  const blocked = product.soldOut || !available;
 
   return (
     <article className="group">
@@ -53,14 +71,18 @@ export default function ProductCard({ product }: ProductCardProps) {
         <span className="absolute top-3 right-3 text-[10px] font-medium text-white/90">
           {product.category}
         </span>
-        <img
-          src={product.image}
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
+        {product.image ? (
+          <img
+            src={product.image}
+            alt={product.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xs text-neutral-300">Sem imagem</div>
+        )}
         {product.soldOut && (
           <div className="absolute bottom-0 inset-x-0 bg-white/90 text-center text-xs py-2 text-neutral-500">
-            Esgotado
+            Produto esgotado
           </div>
         )}
       </div>
@@ -82,8 +104,9 @@ export default function ProductCard({ product }: ProductCardProps) {
           {product.colors.map((color) => (
             <button
               key={color}
-              onClick={() => setSelectedColor(color)}
-              aria-label={`Cor ${color}`}
+              onClick={() => handleColorChange(color)}
+              aria-label={`Cor ${getColorName(color)}`}
+              title={getColorName(color)}
               className={`w-4 h-4 rounded-full border ${
                 selectedColor === color
                   ? "border-[#8b1538] ring-1 ring-[#8b1538] ring-offset-1"
@@ -95,33 +118,41 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         <div className="flex items-center gap-2 mt-3">
-          {product.sizes.map((size) => (
-            <button
-              key={size}
-              onClick={() => setSelectedSize(size)}
-              className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full border transition-colors ${
-                selectedSize === size
-                  ? "bg-[#8b1538] border-[#8b1538] text-white"
-                  : "border-neutral-300 text-neutral-500"
-              }`}
-            >
-              {size}
-            </button>
-          ))}
+          {product.sizes.map((size) => {
+            const sizeAvailable = isCombinationAvailable(product, size, selectedColor);
+
+            return (
+              <button
+                key={size}
+                onClick={() => setSelectedSize(size)}
+                disabled={!sizeAvailable}
+                title={sizeAvailable ? undefined : "Indisponível nesta cor"}
+                className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full border transition-colors ${
+                  !sizeAvailable
+                    ? "border-neutral-200 text-neutral-300 line-through cursor-not-allowed"
+                    : selectedSize === size
+                    ? "bg-[#8b1538] border-[#8b1538] text-white"
+                    : "border-neutral-300 text-neutral-500"
+                }`}
+              >
+                {size}
+              </button>
+            );
+          })}
         </div>
 
         <button
-          disabled={product.soldOut}
+          disabled={blocked}
           onClick={handleAddToCart}
           className={`mt-4 w-full text-sm font-medium py-2.5 rounded-full transition-colors ${
-            product.soldOut
+            blocked
               ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
               : added
               ? "bg-emerald-600 text-white"
               : "bg-[#8b1538] hover:bg-[#71102d] text-white"
           }`}
         >
-          {product.soldOut ? "Produto Esgotado" : added ? "✓ Adicionado!" : "Adicionar ao Carrinho"}
+          {product.soldOut ? "Produto Esgotado" : !available ? "Combinação indisponível" : added ? "✓ Adicionado!" : "Adicionar ao Carrinho"}
         </button>
         {notice && <p className="text-[11px] text-red-600 mt-2">{notice}</p>}
       </div>
