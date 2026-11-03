@@ -26,12 +26,17 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
   const [added, setAdded] = useState(false);
 
-  function handleAddToCart() {
-  if (!addToCart(product, selectedSize, selectedColor)) return;
+  const [notice, setNotice] = useState("");
 
-  setAdded(true);
-  setTimeout(() => setAdded(false), 1500);
-}
+  function handleAddToCart() {
+    setNotice("");
+    if (!addToCart(product, selectedSize, selectedColor)) {
+      setNotice("Combinação indisponível ou faça login.");
+      return;
+    }
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1500);
+  }
 
   return (
     <article className="group">
@@ -55,7 +60,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         />
         {product.soldOut && (
           <div className="absolute bottom-0 inset-x-0 bg-white/90 text-center text-xs py-2 text-neutral-500">
-            Apenas poucas unidades disponível
+            Esgotado
           </div>
         )}
       </div>
@@ -118,6 +123,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         >
           {product.soldOut ? "Produto Esgotado" : added ? "✓ Adicionado!" : "Adicionar ao Carrinho"}
         </button>
+        {notice && <p className="text-[11px] text-red-600 mt-2">{notice}</p>}
       </div>
     </article>
   );

@@ -16,6 +16,7 @@ import RequireAuth from "./components/RequireAuth";
 import AdminOverview from "./pages/admin/AdminOverview";
 import AdminSales from "./pages/admin/AdminSales";
 import AdminStock from "./pages/admin/AdminStock";
+import AdminProducts from "./pages/admin/AdminProducts";
 
 // App é o componente principal da aplicação responsável pela visualização das páginas
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
         <Route index element={<AdminOverview />} />                  {/* "/admin" */}
         <Route path="vendas" element={<AdminSales />} />             {/* "/admin/vendas" */}
         <Route path="estoque" element={<AdminStock />} />            {/* "/admin/estoque" */}
+        <Route path="produtos" element={<AdminProducts />} />        {/* "/admin/produtos" */}
       </Route>
     </Routes>
   );

@@ -4,6 +4,8 @@ import AdminTopBar from "./AdminTopBar";
 import { useOrders } from "../../components/OrdersContext";
 import type { StockItem, StockCategory } from "../../types/stock";
 import { matchesSearch } from "../../components/Search";
+import { useShop } from "../../components/ShopContext";
+import { normalizeText } from "../../components/Search";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -13,7 +15,7 @@ function formatPrice(value: number) {
 type NewItemDraft = {
   sku: string;
   product: string;
-  variation: string;
+  variation: string; // "Cor / Tamanho"
   category: StockCategory;
   price: string;
   stock: string;
@@ -23,7 +25,7 @@ const EMPTY_DRAFT: NewItemDraft = {
   sku: "",
   product: "",
   variation: "",
-  category: "Fitness",
+  category: "Top",
   price: "",
   stock: "",
 };
@@ -33,20 +35,21 @@ const CELL_INPUT_CLASS =
 
 // Página de estoque que gerencia o inventário com busca de produtos, remoção e edição inline da quantidade em estoque
 export default function AdminStock() {
-  // Estoque global: o mesmo que é baixado quando um pagamento é confirmado em Vendas
-  const { stock, addStockItem, setStockQuantity, removeStockItem } = useOrders();
+  const { products } = useShop();
+  const { stock, loading, error, reload, addStockItem, setStockQuantity, removeStockItem } = useOrders();
   const [search, setSearch] = useState("");
 
-  // Edição do estoque de uma linha existente 
   const [editingSku, setEditingSku] = useState<string | null>(null);
   const [draftValue, setDraftValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [rowError, setRowError] = useState("");
 
-  // Linha nova
   const [newItem, setNewItem] = useState<NewItemDraft | null>(null);
   const [newItemError, setNewItemError] = useState("");
 
   function startEditing(item: StockItem) {
-    setNewItem(null); 
+    setNewItem(null);
+    setRowError("");
     setEditingSku(item.sku);
     setDraftValue(String(item.stock));
   }
@@ -54,21 +57,31 @@ export default function AdminStock() {
   function cancelEditing() {
     setEditingSku(null);
     setDraftValue("");
+    setRowError("");
   }
 
-  function saveEditing(sku: string) {
-    const newStock = Number(draftValue);
-    if (Number.isNaN(newStock) || newStock < 0) return;
-
-    setStockQuantity(sku, newStock);
-    cancelEditing();
+  async function saveEditing(item: StockItem) {
+    const value = Number(draftValue);
+    if (draftValue === "" || !Number.isInteger(value) || value < 0) {
+      setRowError("O estoque deve ser um número inteiro maior ou igual a zero.");
+      return;
+    }
+    setBusy(true);
+    const result = await setStockQuantity(item.sku, value);
+    setBusy(false);
+    if (result.ok) cancelEditing();
+    else setRowError(result.message ?? "Não foi possível salvar o estoque.");
   }
 
-  function removeItem(sku: string) {
-    removeStockItem(sku);
+  async function removeItem(item: StockItem) {
+    if (!window.confirm(`Excluir a variação ${item.sku}? Essa ação não pode ser desfeita.`)) return;
+    setRowError("");
+    setBusy(true);
+    const result = await removeStockItem(item.sku);
+    setBusy(false);
+    if (!result.ok) setRowError(result.message ?? "Não foi possível excluir.");
   }
 
-  // Clicar em "Novo Produto" abre uma linha em branco no topo da tabela
   function startNewItem() {
     cancelEditing();
     setNewItem({ ...EMPTY_DRAFT });
@@ -80,30 +93,33 @@ export default function AdminStock() {
     setNewItemError("");
   }
 
-  // Atualiza um campo do rascunho, mantendo os outros
   function updateDraft<K extends keyof NewItemDraft>(field: K, value: NewItemDraft[K]) {
     setNewItem((prev) => (prev ? { ...prev, [field]: value } : prev));
   }
 
-  function saveNewItem() {
+  async function saveNewItem() {
     if (!newItem) return;
 
     const sku = newItem.sku.trim().toUpperCase();
-    const product = newItem.product.trim();
-    const price = Number(newItem.price.replace(",", "."));
     const quantity = Number(newItem.stock);
 
-    // Validações
-    if (!sku || !product) {
-      setNewItemError("Preencha o SKU e o nome do produto.");
+    // O produto precisa existir (cadastrado na tela Produtos)
+    const product = products.find((p) => normalizeText(p.name) === normalizeText(newItem.product));
+
+    if (!sku) {
+      setNewItemError("Informe o SKU.");
+      return;
+    }
+    if (!product) {
+      setNewItemError("Produto não encontrado. Cadastre-o primeiro na tela Produtos.");
+      return;
+    }
+    if (!/^[^/]+\/[^/]+$/.test(newItem.variation.trim())) {
+      setNewItemError('Informe a variação no formato "Cor / Tamanho" (ex.: Preto / M).');
       return;
     }
     if (stock.some((item) => item.sku === sku)) {
       setNewItemError("Já existe um item com esse SKU.");
-      return;
-    }
-    if (newItem.price === "" || Number.isNaN(price) || price < 0) {
-      setNewItemError("Informe um preço válido.");
       return;
     }
     if (newItem.stock === "" || !Number.isInteger(quantity) || quantity < 0) {
@@ -113,15 +129,22 @@ export default function AdminStock() {
 
     const created: StockItem = {
       sku,
-      product,
+      productId: product.id,
+      product: product.name,
       variation: newItem.variation.trim(),
-      category: newItem.category,
-      price,
+      category: product.category,
+      price: product.price,
       stock: quantity,
     };
-    addStockItem(created);
-    cancelNewItem();
+
+    setBusy(true);
+    const result = await addStockItem(created);
+    setBusy(false);
+
+    if (result.ok) cancelNewItem();
+    else setNewItemError(result.message ?? "Não foi possível cadastrar.");
   }
+
 
   const filteredStock = stock.filter((item) =>
     matchesSearch(search, item.sku, item.product, item.variation, item.category)
@@ -130,6 +153,16 @@ export default function AdminStock() {
   return (
     <div>
       <AdminTopBar title="Estoque" />
+
+      {error && (
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button onClick={() => reload()} className="underline">Tentar novamente</button>
+        </div>
+      )}
+      {rowError && (
+        <p className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{rowError}</p>
+      )}
 
       <div className="bg-white rounded-2xl shadow overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 bg-neutral-50">
@@ -150,7 +183,7 @@ export default function AdminStock() {
               className="flex items-center gap-1.5 bg-[#8b1538] hover:bg-[#71102d] transition-colors text-white text-xs font-medium px-4 py-2 rounded-full whitespace-nowrap"
             >
               <Plus size={14} />
-              Novo Produto
+              Nova Variação
             </button>
           </div>
         </div>
@@ -182,9 +215,10 @@ export default function AdminStock() {
                   </td>
                   <td className="px-4 py-3">
                     <input
+                      list="product-names"
                       value={newItem.product}
                       onChange={(e) => updateDraft("product", e.target.value)}
-                      placeholder="Nome do produto"
+                      placeholder="Escolha o produto"
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
@@ -196,16 +230,7 @@ export default function AdminStock() {
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
-                  <td className="px-4 py-3">
-                    <select
-                      value={newItem.category}
-                      onChange={(e) => updateDraft("category", e.target.value as StockCategory)}
-                      className={CELL_INPUT_CLASS}
-                    >
-                      <option value="Lingerie">Lingerie</option>
-                      <option value="Fitness">Fitness</option>
-                    </select>
-                  </td>
+                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Herdados do produto</td>
                   <td className="px-4 py-3">
                     <input
                       type="number"
@@ -217,27 +242,20 @@ export default function AdminStock() {
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      min="0"
-                      value={newItem.stock}
-                      onChange={(e) => updateDraft("stock", e.target.value)}
-                      placeholder="0"
-                      className={CELL_INPUT_CLASS}
-                    />
-                  </td>
+                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Herdados do produto</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={saveNewItem}
-                        className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full"
+                        disabled={busy}
+                        className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60"
                       >
                         <Check size={12} />
-                        Salvar
+                        {busy ? "Salvando..." : "Salvar"}
                       </button>
                       <button
                         onClick={cancelNewItem}
+                        disabled={busy}
                         className="flex items-center gap-1 border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-1.5 rounded-full"
                       >
                         <X size={12} />
@@ -246,7 +264,6 @@ export default function AdminStock() {
                     </div>
                   </td>
                 </tr>
-
                 {newItemError && (
                   <tr className="bg-[#faf1f0]">
                     <td colSpan={7} className="px-6 pb-3 text-xs text-red-600">
@@ -271,11 +288,11 @@ export default function AdminStock() {
                     </span>
                   </td>
                   <td className="px-6 py-4">{formatPrice(item.price)}</td>
-
                   <td className="px-6 py-4">
                     {isEditing ? (
                       <input
                         type="number"
+                        min="0"
                         value={draftValue}
                         onChange={(e) => setDraftValue(e.target.value)}
                         className="w-16 border border-neutral-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-[#8b1538]"
@@ -289,22 +306,25 @@ export default function AdminStock() {
                         </span>
                       </span>
                     ) : (
-                      <span className="text-amber-600 font-medium">{item.stock}</span>
+                      <span className={`font-medium ${item.stock <= 3 ? "text-amber-600" : "text-emerald-600"}`}>
+                        {item.stock}
+                      </span>
                     )}
                   </td>
-
                   <td className="px-6 py-4">
                     {isEditing ? (
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => saveEditing(item.sku)}
-                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full"
+                          onClick={() => saveEditing(item)}
+                          disabled={busy}
+                          className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 transition-colors text-white text-xs font-medium px-3 py-1.5 rounded-full disabled:opacity-60"
                         >
                           <Check size={12} />
-                          Salvar
+                          {busy ? "Salvando..." : "Salvar"}
                         </button>
                         <button
                           onClick={cancelEditing}
+                          disabled={busy}
                           className="flex items-center gap-1 border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors text-xs font-medium px-3 py-1.5 rounded-full"
                         >
                           <X size={12} />
@@ -321,9 +341,10 @@ export default function AdminStock() {
                           <Pencil size={15} />
                         </button>
                         <button
-                          onClick={() => removeItem(item.sku)}
+                          onClick={() => removeItem(item)}
+                          disabled={busy}
                           aria-label="Excluir"
-                          className="text-neutral-400 hover:text-red-500"
+                          className="text-neutral-400 hover:text-red-500 disabled:opacity-50"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -335,6 +356,18 @@ export default function AdminStock() {
             })}
           </tbody>
         </table>
+        <datalist id="product-names">
+          {products.map((p) => (
+            <option key={p.id} value={p.name} />
+          ))}
+        </datalist>
+
+        {loading && stock.length === 0 && (
+          <p className="text-sm text-neutral-500 text-center py-8">Carregando estoque...</p>
+        )}
+        {!loading && filteredStock.length === 0 && (
+          <p className="text-sm text-neutral-400 text-center py-8">Nenhum item encontrado.</p>
+        )}
       </div>
     </div>
   );

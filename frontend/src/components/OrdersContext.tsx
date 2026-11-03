@@ -10,6 +10,17 @@ import { normalizeText } from "../components/Search";
 import { useAuth } from "./AuthContext";
 import { useShop } from "./ShopContext";
 
+export type ProductInput = {
+  name: string;
+  description: string;
+  price: number;
+  oldPrice: number | null; // null = sem promoção
+  category: string;
+};
+
+// Foto escolhida no formulário, ainda não enviada (color null = foto geral)
+export type PendingImage = { file: File; color: string | null };
+
 type OrdersContextType = {
   orders: Order[];
   stock: StockItem[];
@@ -23,6 +34,10 @@ type OrdersContextType = {
   addStockItem: (item: StockItem) => Promise<ActionResult>;
   setStockQuantity: (sku: string, quantity: number) => Promise<ActionResult>;
   removeStockItem: (sku: string) => Promise<ActionResult>;
+  createProduct: (data: ProductInput, images?: PendingImage[]) => Promise<ActionResult>;
+  updateProduct: (id: string, data: ProductInput, images?: PendingImage[]) => Promise<ActionResult>;
+  deleteProduct: (id: string) => Promise<ActionResult>;
+  removeProductImage: (productId: string, imageId: string) => Promise<ActionResult>;
 };
 
 const OrdersContext = createContext<OrdersContextType | null>(null);
@@ -112,6 +127,81 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     }
   }
 
+     // Envia as fotos agrupadas por cor (uma requisição por cor)
+  async function uploadImages(productId: number, images: PendingImage[]) {
+    const groups = new Map<string, File[]>();
+    for (const { file, color } of images) {
+      const key = color ?? "";
+      groups.set(key, [...(groups.get(key) ?? []), file]);
+    }
+    for (const [color, files] of groups) {
+      await adminApi.uploadProductImages(productId, files, color || null);
+    }
+  }
+
+  async function createProduct(data: ProductInput, images: PendingImage[] = []): Promise<ActionResult> {
+    let productId: number;
+    try {
+      const created = (await adminApi.createProduct({ ...data, stock: 0 })) as { product: { id: number } };
+      productId = created.product.id;
+    } catch (e) {
+      return { ok: false, message: errorMessage(e) };
+    }
+
+    if (images.length > 0) {
+      try {
+        await uploadImages(productId, images);
+      } catch (e) {
+        await refreshAfterStockChange();
+        return {
+          ok: false,
+          message: `Produto criado, mas as fotos falharam: ${errorMessage(e)} Edite o produto para enviar de novo.`,
+        };
+      }
+    }
+    await refreshAfterStockChange();
+    return { ok: true };
+  }
+
+  async function updateProduct(id: string, data: ProductInput, images: PendingImage[] = []): Promise<ActionResult> {
+    try {
+      await adminApi.updateProduct(Number(id), data);
+    } catch (e) {
+      return { ok: false, message: errorMessage(e) };
+    }
+
+    if (images.length > 0) {
+      try {
+        await uploadImages(Number(id), images);
+      } catch (e) {
+        await refreshAfterStockChange();
+        return { ok: false, message: `Produto atualizado, mas as fotos falharam: ${errorMessage(e)}` };
+      }
+    }
+    await refreshAfterStockChange();
+    return { ok: true };
+  }
+
+  async function removeProductImage(productId: string, imageId: string): Promise<ActionResult> {
+    try {
+      await adminApi.deleteProductImage(Number(productId), Number(imageId));
+      await refreshAfterStockChange();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: errorMessage(e) };
+    }
+  }
+
+  async function deleteProduct(id: string): Promise<ActionResult> {
+    try {
+      await adminApi.deleteProduct(Number(id));
+      await refreshAfterStockChange();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, message: errorMessage(e) };
+    }
+  }
+ 
   return (
     <OrdersContext.Provider
       value={{
@@ -126,6 +216,10 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         addStockItem,
         setStockQuantity,
         removeStockItem,
+        createProduct,
+        updateProduct,
+        removeProductImage,
+        deleteProduct
       }}
     >
       {children}
