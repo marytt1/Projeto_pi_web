@@ -5,6 +5,7 @@ import { imageUrl } from "./api";
 import type { Order, OrderStatus } from "../types/order";
 import type { StockItem } from "../types/stock";
 import type { User } from "../types/user";
+import type { ProductImageItem } from "../types/product";
 
 // formatos da API
 export type ApiVariant = { id: number; sku: string; size: string; color: string; stock: number };
@@ -17,7 +18,9 @@ export type ApiProduct = {
   category: string;
   image_url: string | null;
   createdAt: string;
+  description?: string | null;
   Variants?: ApiVariant[];
+  ProductImages?: { id: number; url: string; color: string | null; position: number }[];
 };
 
 export type ApiQuoteItem = {
@@ -42,19 +45,35 @@ export type ApiFavorite = {
 // cores
 const COLOR_HEX: Record<string, string> = {
   Preto: "#111111",
+  Branco: "#ffffff",
+  "Off White": "#f5f0e6",
+  Cinza: "#8a8a8a",
+  Nude: "#e3b7a0",
+  Bege: "#d9c3a5",
+  Marrom: "#6b4226",
+  Vermelho: "#c8102e",
   Borgonha: "#8b1538",
-  Pink: "#e0399c",
+  Vinho: "#3a1116",
+  Rosê: "#c46b7e",
   Rosa: "#e76ea3",
   "Rosa Claro": "#f2b9c9",
-  Vinho: "#3a1116",
+  Pink: "#e0399c",
+  Lilás: "#b78bd6",
+  Roxo: "#5b2a86",
+  Azul: "#2f6fd1",
+  "Azul Marinho": "#14234b",
+  Verde: "#2e8b57",
+  Amarelo: "#f2c230",
+  Laranja: "#ef7d22",
 };
+
 const FALLBACK_HEX = "#cccccc";
 export const colorHex = (name: string) => COLOR_HEX[name] ?? FALLBACK_HEX;
 
 // tamanhos
 const SIZE_ORDER = ["PP", "P", "M", "G", "GG", "XG"];
 
-function compareSizes(a: string, b: string) {
+export function compareSizes(a: string, b: string) {
   const ia = SIZE_ORDER.indexOf(a);
   const ib = SIZE_ORDER.indexOf(b);
   if (ia !== -1 && ib !== -1) return ia - ib;
@@ -68,6 +87,7 @@ const LOW_STOCK_TOTAL = 5;
 const NEW_DAYS = 30; 
 
 function buildBadge(p: ApiProduct, totalStock: number): ProductBadge | undefined {
+
   if (p.oldPrice && p.oldPrice > p.price) return { label: "Promoção", tone: "promo" };
   if (totalStock > 0 && totalStock <= LOW_STOCK_TOTAL) return { label: "Pouco Estoque", tone: "estoque" };
   const ageDays = (Date.now() - new Date(p.createdAt).getTime()) / 86_400_000;
@@ -79,10 +99,12 @@ function buildBadge(p: ApiProduct, totalStock: number): ProductBadge | undefined
 export function toProduct(p: ApiProduct): Product {
   const variants = p.Variants ?? [];
   const totalStock = variants.reduce((sum, v) => sum + v.stock, 0);
-
   const colorNames = [...new Set(variants.map((v) => v.color))];
   const colorOptions: ColorOption[] = colorNames.map((name) => ({ name, hex: colorHex(name) }));
   const sizes = [...new Set(variants.map((v) => v.size))].sort(compareSizes);
+  const images: ProductImageItem[] = [...(p.ProductImages ?? [])]
+    .sort((a, b) => a.position - b.position)
+    .map((i) => ({ id: String(i.id), url: imageUrl(i.url) ?? "", colorName: i.color }));
 
   return {
     id: String(p.id),
@@ -93,9 +115,11 @@ export function toProduct(p: ApiProduct): Product {
     badge: buildBadge(p, totalStock),
     colors: colorOptions.map((c) => c.hex),
     sizes,
-    image: imageUrl(p.image_url) ?? "",
+    image: images[0]?.url ?? imageUrl(p.image_url) ?? "",
+    images,
     soldOut: variants.length === 0 || totalStock === 0,
     colorOptions,
+    description: p.description ?? "",
     variants: variants.map(
       (v): ProductVariant => ({ id: String(v.id), size: v.size, colorName: v.color, stock: v.stock })
     ),

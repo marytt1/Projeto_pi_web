@@ -1,11 +1,12 @@
 import { NavLink, useNavigate } from "react-router";
 import { useAuth } from "../../components/AuthContext";
-import { LayoutGrid, CreditCard, Archive, LogOut, UserCircle } from "lucide-react";
+import { LayoutGrid, CreditCard, Archive, LogOut, UserCircle, Shirt } from "lucide-react";
 
 const MENU_ITEMS = [
   { to: "/admin", label: "Dashboard", icon: LayoutGrid, end: true },
   { to: "/admin/vendas", label: "Vendas", icon: CreditCard, end: false },
   { to: "/admin/estoque", label: "Estoque", icon: Archive, end: false },
+  { to: "/admin/produtos", label: "Produtos", icon: Shirt, end: false }
 ];
 
 // Componente da Barra lateral de navegação do painel admin com destaque visual para a aba selecionada

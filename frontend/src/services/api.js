@@ -46,7 +46,9 @@ export class ApiError extends Error {
 
 async function request(path, { method = 'GET', body, query, auth = true } = {}) {
     const headers = {};
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
+  
+    if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
 
     const token = session.getToken();
     if (auth && token) headers.Authorization = `Bearer ${token}`;
@@ -60,7 +62,7 @@ async function request(path, { method = 'GET', body, query, auth = true } = {}) 
         res = await fetch(`${BASE_URL}${path}${qs}`, {
             method,
             headers,
-            body: body !== undefined ? JSON.stringify(body) : undefined,
+            body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
         });
     } catch {
         throw new ApiError(0, 'Não foi possível conectar ao servidor.');
@@ -178,9 +180,24 @@ export const admin = {
 
     // Produtos e variações ("Novo Produto", editar e excluir)
     createProduct: (data) => request(PATHS.products, { method: 'POST', body: data }),
+      // Envia 1 ou mais fotos; "color" (opcional) liga o lote a uma cor
+    uploadProductImages: (id, files, color) => {
+        const form = new FormData();
+        if (color) form.append('color', color);
+        files.forEach((file) => form.append('images', file));
+        return request(`${PATHS.products}/${id}/images`, { method: 'POST', body: form });
+    },
+    deleteProductImage: (id, imageId) => request(`${PATHS.products}/${id}/images/${imageId}`, { method: 'DELETE' }),
     updateProduct: (id, data) => request(`${PATHS.products}/${id}`, { method: 'PUT', body: data }),
     deleteProduct: (id) => request(`${PATHS.products}/${id}`, { method: 'DELETE' }),
     createVariant: (data) => request(PATHS.variants, { method: 'POST', body: data }), // { sku, size, color, stock, ProductId }
     updateVariant: (id, data) => request(`${PATHS.variants}/${id}`, { method: 'PUT', body: data }),
     deleteVariant: (id) => request(`${PATHS.variants}/${id}`, { method: 'DELETE' }),
 };
+
+// Calculadora de tamanho
+export const sizeGuide = {
+  calculate: (bust, waist, hip) =>
+    request(`${PATHS.users}/size-guide`, { method: 'POST', body: { busto: bust, cintura: waist, quadril: hip } }),
+};
+

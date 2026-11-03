@@ -1,5 +1,5 @@
 // Categorias possíveis de um produto
-export type ProductCategory = "Top" | "Shorts" | "Macaquinho" | "Cropped";
+export type ProductCategory = string;
 
 // Cor/estilo visual de cada selo (badge) que aparece no card do produto
 export type ProductBadgeTone = "promo" | "estoque" | "novo" | "vendido";
@@ -22,6 +22,13 @@ export type ColorOption = {
   hex: string;
 };
 
+// Foto da galeria de um produto (colorName null = foto geral)
+export type ProductImageItem = {
+  id: string;
+  url: string;
+  colorName: string | null;
+};
+
 // Formato de um produto da vitrine
 export type Product = {
   id: string;
@@ -34,6 +41,8 @@ export type Product = {
   sizes: string[];
   image: string;
   soldOut?: boolean;
-  colorOptions?: ColorOption[]; 
-  variants?: ProductVariant[];  
+  colorOptions?: ColorOption[];
+  description?: string;
+  variants?: ProductVariant[];
+  images?: ProductImageItem[];  
 };

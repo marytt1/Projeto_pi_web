@@ -4,7 +4,7 @@ import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
 import { useOrders } from "../../components/OrdersContext";
 import { matchesSearch } from "../../components/Search";
-import { formatDate, sortNewestFirst, summarizeItems } from "../../components/Orders";
+import { summarizeItems } from "../../components/Orders";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -12,25 +12,30 @@ function formatPrice(value: number) {
 
 // Página que exibe o painel principal com métricas resumidas (vendas, pendências, alertas) e os últimos pedidos realizados
 export default function AdminOverview() {
- const { orders, stock } = useOrders();
+  const { dashboard, loading, error, reload } = useOrders();
   const [search, setSearch] = useState("");
 
-  const today = formatDate(new Date());
+  const salesToday = dashboard?.salesToday.total ?? 0;
+  const salesCount = dashboard?.salesToday.orders ?? 0;
+  const pendingOrders = dashboard?.pendingOrders ?? 0;
+  const stockAlerts = dashboard?.stockAlerts.count ?? 0;
+  const stockLimit = dashboard?.stockAlerts.limit ?? 3;
 
-  const confirmedToday = orders.filter((o) => o.date === today && o.status !== "Aguardando");
-  const salesToday = confirmedToday.reduce((sum, o) => sum + o.total, 0);
-
-  const pendingOrders = orders.filter((o) => o.status === "Aguardando").length;
-
-  const stockAlerts = stock.filter((row) => row.stock <= 3).length;
-
-  const recentOrders = sortNewestFirst(orders)
-    .slice(0, 5)
-    .filter((o) => matchesSearch(search, o.id, o.customerName, o.customerEmail, summarizeItems(o.items), o.status));
+  const recentOrders = (dashboard?.latestOrders ?? []).filter((o) =>
+    matchesSearch(search, o.id, o.customerName, o.customerEmail, summarizeItems(o.items), o.status)
+  );
 
   return (
     <div>
       <AdminTopBar title="Visão Geral" />
+
+      {error && (
+        <div className="mb-5 flex items-center justify-between rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+          <span>{error}</span>
+          <button onClick={() => reload()} className="underline">Tentar novamente</button>
+        </div>
+      )}
+      {loading && !dashboard && <p className="mb-5 text-sm text-neutral-500">Carregando painel...</p>}
 
       <div className="grid sm:grid-cols-3 gap-5 mb-8">
         <div className="bg-white rounded-2xl shadow p-5">
@@ -42,7 +47,7 @@ export default function AdminOverview() {
           </div>
           <p className="text-2xl font-semibold">{formatPrice(salesToday)}</p>
           <p className="text-xs text-neutral-400 mt-1">
-            {confirmedToday.length} pedido{confirmedToday.length !== 1 && "s"} com pagamento confirmado
+            {salesCount} pedido{salesCount !== 1 && "s"} com pagamento confirmado
           </p>
         </div>
 
@@ -65,7 +70,7 @@ export default function AdminOverview() {
             </span>
           </div>
           <p className="text-2xl font-semibold">{stockAlerts}</p>
-          <p className="text-xs text-neutral-400 mt-1">variações com 3 ou menos unidades</p>
+          <p className="text-xs text-neutral-400 mt-1">variações com {stockLimit} ou menos unidades</p>
         </div>
       </div>
 
@@ -113,7 +118,6 @@ export default function AdminOverview() {
             ))}
           </tbody>
         </table>
-
         {recentOrders.length === 0 && (
           <p className="text-sm text-neutral-400 text-center py-8">Nenhum pedido encontrado.</p>
         )}

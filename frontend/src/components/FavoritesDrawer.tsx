@@ -33,9 +33,9 @@ export default function FavoritesDrawer({ items, onClose, onRemove }: FavoritesD
               <img src={item.image} alt={item.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[#3a3a3a] truncate">{item.name}</p>
-                <p className="text-xs text-neutral-400">
-                  {item.size} · {item.colorName}
-                </p>
+                {item.colors.length > 0 && (
+                  <p className="text-xs text-neutral-400">{item.colors.join(", ")}</p>
+                )}
                 <p className="text-sm font-semibold text-[#8b1538] mt-0.5">{formatPrice(item.price)}</p>
               </div>
               <button

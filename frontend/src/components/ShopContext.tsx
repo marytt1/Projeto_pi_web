@@ -5,7 +5,7 @@ import type { CartItem } from "../types/cart";
 import type { FavoriteItem } from "../types/favorite";
 import { getColorName } from "../data/colors";
 import { findVariant } from "../services/adapters";
-import { useShopData } from "../hooks/userShopData";
+import { useShopData } from "../hooks/useShopData";
 import type { ActionResult } from "../hooks/useShopData";
 import { useAuth } from "./AuthContext";
 
@@ -36,8 +36,8 @@ type ShopContextType = {
 const ShopContext = createContext<ShopContextType | null>(null);
 
 // Nome da cor (ex.: "Preto") a partir do código hex que o card usa
-function colorNameFor(product: Product, colorHex: string) {
-  return product.colorOptions?.find((c) => c.hex === colorHex)?.name ?? getColorName(colorHex);
+function colorNameFor(product: Product, color: string) {
+  return product.colorOptions?.find((c) => c.name === color || c.hex === color)?.name ?? getColorName(color);
 }
 
 export function ShopProvider({ children }: { children: ReactNode }) {
