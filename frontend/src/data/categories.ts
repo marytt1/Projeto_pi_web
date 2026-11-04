@@ -11,5 +11,5 @@ export const CATEGORIES: CategoryItem[] = [
   { id: "croppeds", label: "Croppeds", filter: "Cropped", image: croppedGrazyImg },
   { id: "shorts", label: "Shorts", filter: "Shorts", image: shortsPietraImg },
   { id: "macacoes", label: "Macacões", filter: "Macaquinho", image: macaquinhoPaolaImg },
-  { id: "leggings", label: "Leggings", image: leggingEloaImg},
+  { id: "leggings", label: "Leggings", filter: "Legging", image: leggingEloaImg},
 ];

@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
-import { Search, Plus, Pencil, Trash2, Check, X, Package, ImagePlus } from "lucide-react";
+import { Search, Plus, Pencil, Trash2, Check, X, ImagePlus } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import { useOrders } from "../../components/OrdersContext";
 import type { StockItem, StockCategory } from "../../types/stock";
 import { matchesSearch } from "../../components/Search";
 import ProductEditModal from "../../components/ProductEditModal";
 import { makePreview, revokePreview, validateImageFile } from "../../services/imageFile";
-import { COLOR_NAMES } from "../../data/colors";
 import { useShop } from "../../components/ShopContext";
 import { normalizeText } from "../../components/Search";
 
@@ -53,17 +52,15 @@ export default function AdminStock() {
 
   const [newItem, setNewItem] = useState<NewItemDraft | null>(null);
   const [newItemError, setNewItemError] = useState("");
-  const [newImage, setNewImage] = useState<File | null>(null); // imagem do produto novo
+  const [newImage, setNewImage] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
 
-  // Produto aberto na janela "Editar produto" (preço, descrição e imagem)
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-  const [saving, setSaving] = useState(false); // true enquanto a API responde
-  const [actionError, setActionError] = useState(""); // erro de editar ou excluir
-  const [notice, setNotice] = useState(""); // aviso de sucesso ao excluir
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  // Ao abrir a tela, busca o estoque mais recente na API
   useEffect(() => {
     reload();
   }, [reload]);
@@ -118,7 +115,6 @@ export default function AdminStock() {
     setNewItemError("");
   }
 
-  // Imagem escolhida na linha "Novo Produto"
   function handleNewImage(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     revokePreview(newImagePreview);
@@ -138,14 +134,35 @@ export default function AdminStock() {
       return;
     }
 
-    setNewIStemError("");
+    setNewItemError("");
     setNewImage(file);
     setNewImagePreview(makePreview(file));
   }
 
-  // Atualiza um campo do rascunho, mantendo os outros
-  function updateDraft<K extends keyof NewItemDraft>(field: K, value: NewItemDraft[K]) {
-    setNewItem((prev) => (prev ? { ...prev, [field]: value } : prev));
+  // Função para gerar o SKU automaticamente com base no produto selecionado e na variação (Cor / Tamanho)
+  function handleProductOrVariationChange(field: "product" | "variation", value: string) {
+    if (!newItem) return;
+
+    const updatedProduct = field === "product" ? value : newItem.product;
+    const updatedVariation = field === "variation" ? value : newItem.variation;
+
+    // Busca o produto correspondente na lista para pegar o ID real do banco
+    const foundProduct = products.find((p) => normalizeText(p.name) === normalizeText(updatedProduct));
+
+    let generatedSku = newItem.sku;
+    if (foundProduct) {
+      const formattedId = String(foundProduct.id).padStart(2, "0");
+      const parts = updatedVariation.split("/").map((p) => p.trim());
+      const colorPart = parts[0] ? parts[0].substring(0, 3).toUpperCase() : "COR";
+      const sizePart = parts[1] ? parts[1].toUpperCase() : "U";
+      generatedSku = `P${formattedId}-${colorPart}-${sizePart}`;
+    }
+
+    setNewItem({
+      ...newItem,
+      [field]: value,
+      sku: generatedSku,
+    });
   }
 
   async function saveNewItem() {
@@ -153,9 +170,7 @@ export default function AdminStock() {
 
     const sku = newItem.sku.trim().toUpperCase();
     const quantity = Number(newItem.stock);
-    const [color, size] = newItem.variation.split("/").map((part) => part.trim());
 
-    // O produto precisa existir (cadastrado na tela Produtos)
     const product = products.find((p) => normalizeText(p.name) === normalizeText(newItem.product));
 
     if (!sku) {
@@ -196,7 +211,6 @@ export default function AdminStock() {
     if (result.ok) cancelNewItem();
     else setNewItemError(result.message ?? "Não foi possível cadastrar.");
   }
-
 
   const filteredStock = stock.filter((item) =>
     matchesSearch(search, item.sku, item.product, item.variation, item.category)
@@ -258,10 +272,9 @@ export default function AdminStock() {
                 <tr className="border-b border-neutral-100 bg-[#faf1f0]">
                   <td className="px-4 py-3">
                     <input
-                      autoFocus
                       value={newItem.sku}
-                      onChange={(e) => updateDraft("sku", e.target.value)}
-                      placeholder="P07-BRD-M"
+                      onChange={(e) => setNewItem({ ...newItem, sku: e.target.value })}
+                      placeholder="SKU automático"
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
@@ -269,7 +282,7 @@ export default function AdminStock() {
                     <input
                       list="product-names"
                       value={newItem.product}
-                      onChange={(e) => updateDraft("product", e.target.value)}
+                      onChange={(e) => handleProductOrVariationChange("product", e.target.value)}
                       placeholder="Escolha o produto"
                       className={CELL_INPUT_CLASS}
                     />
@@ -277,24 +290,32 @@ export default function AdminStock() {
                   <td className="px-4 py-3">
                     <input
                       value={newItem.variation}
-                      onChange={(e) => updateDraft("variation", e.target.value)}
-                      placeholder="Cor / Tamanho"
+                      onChange={(e) => handleProductOrVariationChange("variation", e.target.value)}
+                      placeholder="Cor / Tamanho (ex: Preto / M)"
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
-                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Herdados do produto</td>
+                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Vem do produto</td>
                   <td className="px-4 py-3">
+                    {/* CAMPO DE ESTOQUE APENAS INTEIROS */}
                     <input
                       type="number"
                       min="0"
-                      step="0.01"
-                      value={newItem.price}
-                      onChange={(e) => updateDraft("price", e.target.value)}
-                      placeholder="0,00"
+                      step="1"
+                      value={newItem.stock}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/[.,-]/g, "");
+                        setNewItem({ ...newItem, stock: val });
+                      }}
+                      onKeyDown={(e) => {
+                        if (["e", "E", ".", ",", "-"].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      placeholder="0"
                       className={CELL_INPUT_CLASS}
                     />
                   </td>
-                  <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Herdados do produto</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
@@ -334,10 +355,6 @@ export default function AdminStock() {
                         <img src={newImagePreview} alt="Prévia da imagem" className="w-12 h-12 rounded-lg object-cover" />
                       )}
                     </div>
-                    <p className="text-[11px] text-neutral-400 mt-1">
-                      Só é usada quando o produto é novo. Para trocar a imagem de um produto que já existe, use o botão
-                      “Editar produto” na linha dele.
-                    </p>
                   </td>
                 </tr>
 
@@ -367,11 +384,21 @@ export default function AdminStock() {
                   <td className="px-6 py-4">{formatPrice(item.price)}</td>
                   <td className="px-6 py-4">
                     {isEditing ? (
+                      /* CAMPO DE EDIÇÃO NA TABELA APENAS INTEIROS */
                       <input
                         type="number"
                         min="0"
+                        step="1"
                         value={draftValue}
-                        onChange={(e) => setDraftValue(e.target.value)}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[.,-]/g, "");
+                          setDraftValue(val);
+                        }}
+                        onKeyDown={(e) => {
+                          if (["e", "E", ".", ",", "-"].includes(e.key)) {
+                            e.preventDefault();
+                          }
+                        }}
                         className="w-16 border border-neutral-200 rounded-lg px-2 py-1 text-sm outline-none focus:border-[#8b1538]"
                         autoFocus
                       />

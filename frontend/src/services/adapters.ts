@@ -20,7 +20,6 @@ export type ApiProduct = {
   category: string;
   image_url: string | null;
   createdAt: string;
-  description?: string | null;
   Variants?: ApiVariant[];
   ProductImages?: { id: number; url: string; color: string | null; position: number }[];
 };
@@ -46,27 +45,84 @@ export type ApiFavorite = {
 
 // cores
 const COLOR_HEX: Record<string, string> = {
-  Preto: "#111111",
-  Branco: "#ffffff",
-  "Off White": "#f5f0e6",
-  Cinza: "#8a8a8a",
-  Nude: "#e3b7a0",
-  Bege: "#d9c3a5",
-  Marrom: "#6b4226",
-  Vermelho: "#c8102e",
-  Borgonha: "#8b1538",
-  Vinho: "#3a1116",
-  Rosê: "#c46b7e",
-  Rosa: "#e76ea3",
-  "Rosa Claro": "#f2b9c9",
-  Pink: "#e0399c",
-  Lilás: "#b78bd6",
-  Roxo: "#5b2a86",
-  Azul: "#2f6fd1",
-  "Azul Marinho": "#14234b",
-  Verde: "#2e8b57",
-  Amarelo: "#f2c230",
-  Laranja: "#ef7d22",
+    "Preto": "#111111",
+    "Branco": "#ffffff",
+    "Off White": "#f5f0e6",
+    "Cinza": "#8a8a8a",
+    "Nude": "#e3b7a0",
+    "Bege": "#d9c3a5",
+    "Marrom": "#6b4226",
+    "Vermelho": "#c8102e",
+    "Borgonha": "#8b1538",
+    "Vinho": "#3a1116",
+    "Rosê": "#c46b7e",
+    "Rosa": "#e76ea3",
+    "Rosa Claro": "#f2b9c9",
+    "Pink": "#e0399c",
+    "Lilás": "#b78bd6",
+    "Roxo": "#5b2a86",
+    "Azul": "#2f6fd1",
+    "Azul Marinho": "#14234b",
+    "Verde": "#2e8b57",
+    "Amarelo": "#f2c230",
+    "Laranja": "#ef7d22",
+    // cores novas das coleções
+    "Azul Bebe": "#a9cdf0",
+    "Azul Bebe com Marinho": "#a9cdf0",  // composta: usa a 1ª cor
+    "Azul Capri": "#1fa3d6",
+    "Azul Celeste": "#87ceeb",
+    "Azul Marinho com Branco": "#14234b",  // composta: usa a 1ª cor
+    "Azul Royal": "#2255c4",
+    "Bordô": "#6d1030",
+    "Bordô com Branco": "#6d1030",  // composta: usa a 1ª cor
+    "Branco com Preto": "#ffffff",  // composta: usa a 1ª cor
+    "Caffe Latte": "#b89b7e",
+    "Café": "#5a3b2a",
+    "Cappuccino": "#a98467",
+    "Chocolate": "#4b2e1e",
+    "Chocolate Escuro": "#2f1c12",
+    "Chocolate Escuro com Creme": "#2f1c12",  // composta: usa a 1ª cor
+    "Chocolate com Branco": "#4b2e1e",  // composta: usa a 1ª cor
+    "Chocolate com Creme": "#4b2e1e",  // composta: usa a 1ª cor
+    "Cinza Escuro": "#4a4a4a",
+    "Cinza com Branco": "#8a8a8a",  // composta: usa a 1ª cor
+    "Creme": "#f3e9d2",
+    "Creme com Chocolate": "#f3e9d2",  // composta: usa a 1ª cor
+    "Espresso": "#3a2a22",
+    "Espresso com Creme": "#3a2a22",  // composta: usa a 1ª cor
+    "Espresso com Rosa Pastel": "#3a2a22",  // composta: usa a 1ª cor
+    "Frappuccino": "#cbb59b",
+    "Laranja Cusco": "#d9742b",
+    "Lavanda": "#c3b1e1",
+    "Marinho": "#14234b",
+    "Marinho com Azul Bebe": "#14234b",  // composta: usa a 1ª cor
+    "Marinho com Branco": "#14234b",  // composta: usa a 1ª cor
+    "Marinho com Creme": "#14234b",  // composta: usa a 1ª cor
+    "Marrom Escuro": "#3e2616",
+    "Marrom Escuro com Creme": "#3e2616",  // composta: usa a 1ª cor
+    "Mocha Mousse": "#a47864",
+    "Off White com Preto": "#f5f0e6",  // composta: usa a 1ª cor
+    "Petróleo com Branco": "#1f4e5a",  // composta: usa a 1ª cor
+    "Preto com Amarelo Neon": "#111111",  // composta: usa a 1ª cor
+    "Preto com Branco": "#111111",  // composta: usa a 1ª cor
+    "Preto com Creme": "#111111",  // composta: usa a 1ª cor
+    "Preto com Neon": "#111111",  // composta: usa a 1ª cor
+    "Preto com Rosa Barbie": "#111111",  // composta: usa a 1ª cor
+    "Preto com Rosa Neon": "#111111",  // composta: usa a 1ª cor
+    "Rosa Barbie": "#e0218a",
+    "Rosa Barbie com Branco": "#e0218a",  // composta: usa a 1ª cor
+    "Rosa Bebe": "#f8c8dc",
+    "Rosa Chiclete": "#f4a6c8",
+    "Rosa Iogurte": "#f5cfd8",
+    "Rosa Neon": "#ff2f92",
+    "Rosa Pastel com Espresso": "#f6c9cf",  // composta: usa a 1ª cor
+    "Roxo Escuro": "#3a1856",
+    "Verde Bandeira": "#009c3b",
+    "Verde Menta": "#98e0b8",
+    "Verde Militar": "#4b5320",
+    "Vermelho Escarlate": "#e0200f",
+    "Vermelho com Creme": "#c8102e",  // composta: usa a 1ª cor
+    "Único": "#cccccc",
 };
 
 const FALLBACK_HEX = "#cccccc";
@@ -86,7 +142,7 @@ export function compareSizes(a: string, b: string) {
 
 // selos (badge)
 const LOW_STOCK_TOTAL = 5; // "Pouco Estoque" quando o total de unidades é igual ou menor que isso
-const NEW_DAYS = 30; // "Novo" nos primeiros 30 dias
+const NEW_DAYS = 10; // "Novo" nos primeiros 10 dias
 
 function buildBadge(p: ApiProduct, totalStock: number): ProductBadge | undefined {
 
@@ -107,7 +163,7 @@ export function toProduct(p: ApiProduct): Product {
   const images: ProductImageItem[] = [...(p.ProductImages ?? [])]
     .sort((a, b) => a.position - b.position)
     .map((i) => ({ id: String(i.id), url: imageUrl(i.url) ?? "", colorName: i.color }));
-
+    
   return {
     id: String(p.id),
     name: p.name,
