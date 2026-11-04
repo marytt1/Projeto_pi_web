@@ -24,7 +24,7 @@ import { ApiError, sizeGuide as sizeGuideApi } from "../services/api";
 const HIDE_SCROLLBAR =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
 
-const FILTERS = ["Todos", "Top", "Shorts", "Macaquinho", "Cropped", "Leggings"] as const;
+const FILTERS = ["Todos", "Top", "Shorts", "Macaquinho", "Cropped", "Legging"] as const;
 
 // Componente principal da página inicial que reúne hero, categorias, produtos em destaque, vídeos, guia de tamanhos, diferenciais da marca e feed do Instagram
 export default function Main() {
@@ -135,14 +135,11 @@ function CategoryShowcase() {
 }
 
 // Quantos produtos aparecem na página inicial (o catálogo completo fica em /catalogo)
-const FEATURED_LIMIT = 6;
+const FEATURED_LIMIT = 9;
 
 function FeaturedProducts() {
   const { products, loadingProducts, productsError, reloadProducts } = useShop();
   const [active, setActive] = useState<(typeof FILTERS)[number]>("Todos");
-
-  const { products, loadingProducts, productsError, reloadProducts } = useShop();
-
   const filtered =
     active === "Todos" ? products : products.filter((p) => p.category === active);
 
@@ -152,7 +149,7 @@ function FeaturedProducts() {
     <Section
       id="produtos"
       className="scroll-mt-32"
-      eyebrow="Nossa Coleção Pilates"
+      eyebrow=""
       title="Produtos em Destaque"
       align="start"
       headerActions={
@@ -190,7 +187,7 @@ function FeaturedProducts() {
         </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-12">
-          {filtered.map((product) => (
+          {featured.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
         </div>

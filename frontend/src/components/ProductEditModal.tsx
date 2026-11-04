@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { X, ImagePlus } from "lucide-react";
@@ -34,7 +35,6 @@ export default function ProductEditModal({ productId, onClose, onSaved }: Produc
   const [currentImage, setCurrentImage] = useState<string | null>(null); // imagem que o produto tem hoje
   const [newImage, setNewImage] = useState<File | null>(null); // imagem escolhida agora (opcional)
   const [preview, setPreview] = useState<string | null>(null);
-
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 

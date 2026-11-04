@@ -3,8 +3,6 @@ import { Link, useParams } from "react-router";
 import { ArrowLeft, ShoppingBag, Heart } from "lucide-react";
 import type { Product } from "../types/product";
 import { useShop } from "../components/ShopContext";
-import { isCombinationAvailable, pickDefaultSelection, variantFor } from "../services/adapters";
-import { getColorName } from "../data/colors";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -37,18 +35,9 @@ export default function ProductDetailPage() {
   const product = products.find((p) => p.id === id);
 
   if (!product) {
-    if (loadingProducts) {
-      return (
-        <main className="px-6 md:px-10 py-16 max-w-xl mx-auto text-center">
-          <p className="text-sm text-neutral-400">Carregando produto...</p>
-        </main>
-      );
-    }
-
     return (
       <main className="px-6 md:px-10 py-16 max-w-xl mx-auto text-center">
         <h1 className="font-serif text-3xl text-[#8b1538]">Produto não encontrado</h1>
-        {productsError && <p className="text-sm text-red-600 mt-3">{productsError}</p>}
         <Link to="/catalogo" className="inline-block mt-4 text-sm text-[#8b1538] hover:underline">
           Voltar ao catálogo
         </Link>
@@ -213,9 +202,9 @@ function ProductDetail({ product }: ProductDetailProps) {
 
           {message && <p className="text-xs text-red-600 mt-3">{message}</p>}
 
-          {available && stock !== undefined && stock <= 3 && (
+          {!unavailable && selectedStock <= 3 && (
             <p className="text-xs text-amber-600 mt-3">
-              Restam apenas {stock} unidade{stock !== 1 && "s"}.
+              Restam apenas {selectedStock} unidade{selectedStock !== 1 && "s"}.
             </p>
           )}
 
