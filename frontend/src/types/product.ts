@@ -42,7 +42,6 @@ export type Product = {
   colors: string[]; // códigos hex das cores (continua igual)
   sizes: string[];
   image: string;
-  description?: string; // texto que o admin escreve em "Editar produto"
   soldOut?: boolean;
   colorOptions?: ColorOption[];
   description?: string;

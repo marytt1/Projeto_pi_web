@@ -1,19 +1,16 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { ChevronDown } from "lucide-react";
 import { matchesSearch, normalizeText } from "../components/Search";
 import CatalogProductCard from "../components/CatalogProductCard";
 import { useShop } from "../components/ShopContext";
 import { compareSizes } from "../services/adapters";
-import { getColorName } from "../data/colors";
 import type { ProductCategory } from "../types/product";
-
-const CATEGORY_OPTIONS: ProductCategory[] = ["Cropped", "Leggings", "Macaquinho", "Shorts", "Top"];
 
 // Página de catálogo com barra lateral de filtros interativos (categoria, tamanho, cor e preço) e listagem dinâmica de produtos
 export default function CatalogPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const categoryParam = searchParams.get("categoria");
+  const [searchParams, setSearchParams] = useSearchParams();
   const searchTerm = searchParams.get("busca") ?? "";
 
   const { products, loadingProducts, productsError, reloadProducts, isFavorite, toggleFavorite } = useShop();
@@ -39,30 +36,63 @@ export default function CatalogPage() {
     return [...byName].map(([name, hex]) => ({ name, hex })).sort((a, b) => a.name.localeCompare(b.name));
   }, [products]);
 
-  // Lê o ?categoria= da URL sem diferenciar maiúsculas, minúsculas e acentos
-  function paramToCategories(): ProductCategory[] {
-    if (!categoryParam) return [];
-    const match = CATEGORY_OPTIONS.find((option) => normalizeText(option) === normalizeText(categoryParam));
-    return match ? [match] : [];
-  }
+  // Categorias marcadas
+  const categoryParam = searchParams.get("categoria") ?? "";
+  const selectedCategories = useMemo(
+    () =>
+      categoryParam
+        .split(",")
+        .map((raw) => categoryOptions.find((opt) => normalizeText(opt) === normalizeText(raw)))
+        .filter((c): c is ProductCategory => Boolean(c)),
+    [categoryParam, categoryOptions]
+  );
 
-  const [selectedCategories, setSelectedCategories] = useState<ProductCategory[]>(paramToCategories);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null); // nome da cor
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
 
+  // Seletor de cor (dropdown)
+  const [colorOpen, setColorOpen] = useState(false);
+  const colorRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    setSelectedCategories(paramToCategories());
-  }, [categoryParam]);
+    function handleClickOutside(e: MouseEvent) {
+      if (colorRef.current && !colorRef.current.contains(e.target as Node)) setColorOpen(false);
+    }
+    function handleEsc(e: KeyboardEvent) {
+      if (e.key === "Escape") setColorOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEsc);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
+  const selectedColorHex = colorFilterOptions.find((c) => c.name === selectedColor)?.hex;
 
   function toggleCategory(category: ProductCategory) {
-    setSelectedCategories((prev) =>
-      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
-    );
+    const next = selectedCategories.includes(category)
+      ? selectedCategories.filter((c) => c !== category)
+      : [...selectedCategories, category];
+
+    const params = new URLSearchParams(searchParams);
+    if (next.length) params.set("categoria", next.join(","));
+    else params.delete("categoria");
+    setSearchParams(params, { replace: true });
   }
 
-const filteredProducts = useMemo(() => {
+  function chooseColor(name: string | null) {
+    setSelectedColor(name);
+    setColorOpen(false);
+  }
+
+  // Aviso simples quando o preço mínimo é maior que o máximo
+  const invalidPriceRange = minPrice !== "" && maxPrice !== "" && Number(minPrice) > Number(maxPrice);
+
+  const filteredProducts = useMemo(() => {
     if (!products) return [];
 
     return products.filter((product) => {
@@ -70,40 +100,38 @@ const filteredProducts = useMemo(() => {
       if (searchTerm && !matchesSearch(searchTerm, product.name, product.category)) {
         return false;
       }
-      
+
       // Filtro de Categoria
       if (selectedCategories.length > 0 && !selectedCategories.includes(product.category)) {
         return false;
       }
-      
-      // Filtro de Tamanho (com proteção caso product.sizes seja undefined)
+
+      // Filtro de Tamanho 
       if (selectedSize && !(product.sizes ?? []).includes(selectedSize)) {
         return false;
       }
-      
-      // Filtro de Cor (com proteção caso colorOptions seja undefined)
+
+      // Filtro de Cor 
       if (selectedColor && !(product.colorOptions ?? []).some((c) => c.name === selectedColor)) {
         return false;
       }
-      
-      // Filtro de Preço Mínimo
-      if (minPrice && product.price < Number(minPrice)) {
+
+      // Filtro de Preço Mínimo / Máximo 
+      const price = Number(product.price);
+      if (minPrice !== "" && price < Number(minPrice)) {
         return false;
       }
-      
-      // Filtro de Preço Máximo
-      if (maxPrice && product.price > Number(maxPrice)) {
+      if (maxPrice !== "" && price > Number(maxPrice)) {
         return false;
       }
 
       return true;
     });
   }, [products, searchTerm, selectedCategories, selectedSize, selectedColor, minPrice, maxPrice]);
-  
+
   return (
     <main className="px-6 md:px-10 py-10">
       <div className="grid md:grid-cols-[220px_1fr] gap-10">
-        {/* BARRA LATERAL (Filtros) */}
         <aside className="flex flex-col gap-8">
           <div>
             <h3 className="font-medium mb-3">Categoria</h3>
@@ -145,28 +173,108 @@ const filteredProducts = useMemo(() => {
 
           <div>
             <h3 className="font-medium mb-3">Cor</h3>
-            <div className="flex flex-wrap gap-2">
-              {colorFilterOptions.length === 0 && <p className="text-xs text-neutral-400">Nenhuma cor ainda.</p>}
-              {colorFilterOptions.map((color) => (
-                <button
-                  key={color.name}
-                  onClick={() => setSelectedColor((prev) => (prev === color.name ? null : color.name))}
-                  aria-label={`Filtrar pela cor ${color.name}`}
-                  className={`flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs transition-colors ${
-                    selectedColor === color.name
-                      ? "border-[#8b1538] text-[#8b1538] bg-[#faf1f0]"
-                      : "border-neutral-200 text-neutral-500"
-                  }`}
+            <div ref={colorRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setColorOpen((open) => !open)}
+                aria-haspopup="listbox"
+                aria-expanded={colorOpen}
+                className={`w-full flex items-center justify-between gap-2 border rounded-lg px-3 py-2 text-sm text-left outline-none transition-colors ${
+                  colorOpen || selectedColor ? "border-[#8b1538]" : "border-neutral-200"
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0">
+                  {selectedColor ? (
+                    <>
+                      <span
+                        className="h-4 w-4 shrink-0 rounded-full ring-1 ring-black/10"
+                        style={{ backgroundColor: selectedColorHex }}
+                      />
+                      <span className="truncate">{selectedColor}</span>
+                    </>
+                  ) : (
+                    <span className="text-neutral-400">Todas as cores</span>
+                  )}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`shrink-0 text-neutral-400 transition-transform ${colorOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {colorOpen && (
+                <ul
+                  role="listbox"
+                  aria-label="Filtrar por cor"
+                  className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto bg-white border border-neutral-200 rounded-lg shadow-lg py-1"
                 >
-                  <span className="h-4 w-4 rounded-full ring-1 ring-black/10" style={{ backgroundColor: color.hex }} />
-                  {color.name}
-                </button>
-              ))}
+                  <li role="option" aria-selected={!selectedColor}>
+                    <button
+                      type="button"
+                      onClick={() => chooseColor(null)}
+                      className={`w-full px-3 py-2 text-sm text-left hover:bg-neutral-50 ${
+                        !selectedColor ? "text-[#8b1538] font-medium" : "text-neutral-500"
+                      }`}
+                    >
+                      Todas as cores
+                    </button>
+                  </li>
+                  {colorFilterOptions.length === 0 && (
+                    <li className="px-3 py-2 text-xs text-neutral-400">Nenhuma cor ainda.</li>
+                  )}
+                  {colorFilterOptions.map((color) => (
+                    <li key={color.name} role="option" aria-selected={selectedColor === color.name}>
+                      <button
+                        type="button"
+                        onClick={() => chooseColor(color.name)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-neutral-50 ${
+                          selectedColor === color.name ? "text-[#8b1538] font-medium bg-[#faf1f0]" : "text-neutral-600"
+                        }`}
+                      >
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full ring-1 ring-black/10"
+                          style={{ backgroundColor: color.hex }}
+                        />
+                        <span className="truncate">{color.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
+          </div>
+
+          <div>
+            <h3 className="font-medium mb-3">Preço</h3>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                placeholder="Mín."
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                aria-label="Preço mínimo"
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b1538]"
+              />
+              <span className="text-neutral-300">-</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                placeholder="Máx."
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                aria-label="Preço máximo"
+                className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#8b1538]"
+              />
+            </div>
+            {invalidPriceRange && (
+              <p className="mt-2 text-xs text-red-600">O preço mínimo está maior que o máximo.</p>
+            )}
           </div>
         </aside>
 
-        {/* CONTEÚDO PRINCIPAL (Listagem de produtos) */}
         <div>
           {searchTerm && (
             <p className="text-sm text-neutral-500 mb-4">
