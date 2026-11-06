@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 import { ArrowLeft, ShoppingBag, Heart } from "lucide-react";
 import type { Product } from "../types/product";
 import { useShop } from "../components/ShopContext";
@@ -15,6 +15,7 @@ const sameColor = (a: string | null | undefined, b: string) =>
 // Página de detalhes do produto: galeria (por cor), seleção de cor e tamanho, compra e favoritos
 export default function ProductDetailPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const { products, loadingProducts, productsError, reloadProducts } = useShop();
 
   if (loadingProducts) {
@@ -45,16 +46,23 @@ export default function ProductDetailPage() {
     );
   }
 
-  // key: ao ir de um produto para outro, a escolha de cor e tamanho recomeça
-  return <ProductDetail key={product.id} product={product} />;
+  return (
+    <ProductDetail
+      key={product.id}
+      product={product}
+      initialColor={searchParams.get("cor") ?? undefined}
+      initialSize={searchParams.get("tamanho") ?? undefined}
+    />
+  );
 }
 
-type ProductDetailProps = { product: Product };
+type ProductDetailProps = { product: Product; initialColor?: string; initialSize?: string };
 
-function ProductDetail({ product }: ProductDetailProps) {
+function ProductDetail({ product, initialColor, initialSize }: ProductDetailProps) {
+  
   const colorOptions = product.colorOptions ?? [];
-  const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.name ?? "");
-  const [chosenSize, setChosenSize] = useState(product.sizes[0] ?? "");
+  const [selectedColor, setSelectedColor] = useState(colorOptions.find((c) => sameColor(c.name, initialColor ?? ""))?.name ?? colorOptions[0]?.name ?? "");
+  const [chosenSize, setChosenSize] = useState(product.sizes.find((s) => s === initialSize) ?? product.sizes[0] ?? "");
   const [activeIndex, setActiveIndex] = useState(0);
   const [added, setAdded] = useState(false);
   const [message, setMessage] = useState("");

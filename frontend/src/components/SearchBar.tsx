@@ -8,19 +8,20 @@ type SearchBarProps = {
   placeholder?: string;
   className?: string;
 };
-
+ 
 export default function SearchBar({
   onSearch,
   placeholder = "Buscar peças...",
   className = "",
 }: SearchBarProps) {
   const [term, setTerm] = useState("");
-
+ 
   function handleSubmit(event: FormEvent) {
-    event.preventDefault(); 
+    event.preventDefault();
     onSearch(term.trim());
+    setTerm("");
   }
-
+ 
   return (
     <form
       onSubmit={handleSubmit}

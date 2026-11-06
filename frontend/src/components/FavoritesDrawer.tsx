@@ -49,19 +49,7 @@ export default function FavoritesDrawer({ items, onClose, onRemove }: FavoritesD
                   {item.name}
                 </Link>
 
-                {item.colors.length > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    {item.colors.map((color) => (
-                      <span
-                        key={color}
-                        title={color}
-                        className="w-3 h-3 rounded-full border border-black/10"
-                        style={{ backgroundColor: colorHex(color) }}
-                      />
-                    ))}
-                  </div>
-                )}
-
+                
                 <p className="text-sm font-semibold text-[#8b1538] mt-0.5">{formatPrice(item.price)}</p>
               </div>
               <button

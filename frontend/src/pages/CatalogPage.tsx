@@ -92,6 +92,25 @@ export default function CatalogPage() {
   // Aviso simples quando o preço mínimo é maior que o máximo
   const invalidPriceRange = minPrice !== "" && maxPrice !== "" && Number(minPrice) > Number(maxPrice);
 
+  // Tem algum filtro (ou busca) ligado?
+  const hasActiveFilters =
+    selectedCategories.length > 0 ||
+    selectedSize !== null ||
+    selectedColor !== null ||
+    minPrice !== "" ||
+    maxPrice !== "" ||
+    searchTerm !== "";
+
+  // Limpa tudo: categoria e busca (que ficam na URL), tamanho, cor e preço
+  function clearFilters() {
+    setSelectedSize(null);
+    setSelectedColor(null);
+    setMinPrice("");
+    setMaxPrice("");
+    setColorOpen(false);
+    setSearchParams(new URLSearchParams(), { replace: true });
+  }
+
   const filteredProducts = useMemo(() => {
     if (!products) return [];
 
@@ -133,6 +152,19 @@ export default function CatalogPage() {
     <main className="px-6 md:px-10 py-10">
       <div className="grid md:grid-cols-[220px_1fr] gap-10">
         <aside className="flex flex-col gap-8">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-widest uppercase text-neutral-700">Filtros</h2>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-xs text-[#8b1538] underline hover:text-[#71102d]"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+
           <div>
             <h3 className="font-medium mb-3">Categoria</h3>
             <div className="flex flex-col gap-2">
@@ -306,7 +338,9 @@ export default function CatalogPage() {
                   product={product}
                   isFavorite={isFavorite(product.id)}
                   onToggleFavorite={() => toggleFavorite(product)}
-                  onViewDetails={(id) => navigate(`/produto/${id}`)}
+                  onViewDetails={(id) =>
+                    navigate(`/produto/${id}${selectedColor ? `?cor=${encodeURIComponent(selectedColor)}` : ""}`)
+                  }
                 />
               ))}
             </div>

@@ -1,7 +1,6 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import type { Product, ProductBadgeTone } from "../types/product";
-import { isCombinationAvailable, pickDefaultSelection } from "../services/adapters";
-import { getColorName } from "../data/colors";
 import { useShop } from "./ShopContext";
 
 type ProductCardProps = {
@@ -19,33 +18,53 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+const sameColor = (a: string | null | undefined, b: string) =>
+  a !== null && a !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase();
+
 // Componente do Card de produto em destaque que exibe foto, selo personalizado, preço com desconto, opções de cores, tamanhos e botão de compra
 export default function ProductCard({ product }: ProductCardProps) {
-
   const { addToCart } = useShop();
 
-  // Começa na primeira combinação de cor e tamanho que tem estoque
-  const initial = pickDefaultSelection(product);
-  const [selectedColor, setSelectedColor] = useState(initial.color);
-  const [selectedSize, setSelectedSize] = useState(initial.size);
+  const colorOptions = product.colorOptions ?? [];
+  const variants = product.variants ?? [];
+
+  const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.name ?? "");
+  const [chosenSize, setChosenSize] = useState(product.sizes[0] ?? "");
   const [added, setAdded] = useState(false);
+  const [notice, setNotice] = useState("");
 
-  // false quando essa cor + tamanho não existem ou estão sem estoque
-  const available = isCombinationAvailable(product, selectedSize, selectedColor);
-
-  // Ao trocar a cor, se o tamanho escolhido não existe nela, vai para o primeiro tamanho que existe
-  function handleColorChange(color: string) {
-    setSelectedColor(color);
-    if (!isCombinationAvailable(product, selectedSize, color)) {
-      const firstSize = product.sizes.find((size) => isCombinationAvailable(product, size, color));
-      if (firstSize) setSelectedSize(firstSize);
-    }
+  function stockFor(size: string, colorName: string) {
+    return variants.find((v) => v.size === size && v.colorName === colorName)?.stock ?? 0;
   }
 
-  const [notice, setNotice] = useState("");
-        
+  const sizesForColor = product.sizes.filter((size) =>
+    variants.some((v) => v.colorName === selectedColor && v.size === size)
+  );
+
+  const selectedSize = sizesForColor.includes(chosenSize) && stockFor(chosenSize, selectedColor) > 0
+    ? chosenSize
+    : (sizesForColor.find((size) => stockFor(size, selectedColor) > 0) ?? sizesForColor[0] ?? "");
+
+  const images = product.images ?? [];
+  const colorImage = images.find((i) => sameColor(i.colorName, selectedColor));
+  const generalImage = images.find((i) => i.colorName === null);
+  const cardImage = colorImage?.url ?? generalImage?.url ?? product.image;
+
+  const selectedStock = selectedSize ? stockFor(selectedSize, selectedColor) : 0;
+  const unavailable = product.soldOut || selectedStock <= 0;
+
+  const params = new URLSearchParams();
+  if (selectedColor) params.set("cor", selectedColor);
+  if (selectedSize) params.set("tamanho", selectedSize);
+  const query = params.toString();
+  const detailsUrl = `/produto/${product.id}${query ? `?${query}` : ""}`;
+
   function handleAddToCart() {
     setNotice("");
+    if (selectedStock <= 0) {
+      setNotice("Essa combinação de cor e tamanho está esgotada.");
+      return;
+    }
     if (!addToCart(product, selectedSize, selectedColor)) {
       setNotice("Combinação indisponível ou faça login.");
       return;
@@ -54,81 +73,96 @@ export default function ProductCard({ product }: ProductCardProps) {
     setTimeout(() => setAdded(false), 1500);
   }
 
-  const blocked = product.soldOut || !available;
+  const buttonLabel = product.soldOut
+    ? "Produto Esgotado"
+    : selectedStock <= 0
+    ? "Combinação Esgotada"
+    : added
+    ? "✓ Adicionado!"
+    : "Adicionar ao Carrinho";
 
   return (
     <article className="group">
-      <div className="relative overflow-hidden bg-neutral-100 aspect-[3/4]">
+      <Link
+        to={detailsUrl}
+        aria-label={`Ver detalhes de ${product.name}`}
+        className="relative block overflow-hidden bg-neutral-100 aspect-[3/4]"
+      >
         {product.badge && (
           <span
-            className={`absolute top-3 left-3 text-[10px] font-medium px-2.5 py-1 rounded-full ${
+            className={`absolute top-3 left-3 z-10 text-[10px] font-medium px-2.5 py-1 rounded-full ${
               BADGE_TONE_CLASSES[product.badge.tone]
             }`}
           >
             {product.badge.label}
           </span>
         )}
-        <span className="absolute top-3 right-3 text-[10px] font-medium text-white/90">
+        <span className="absolute top-3 right-3 z-10 text-[10px] font-medium text-white/90">
           {product.category}
         </span>
-        {product.image ? (
-          <img
-            src={product.image}
-            alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-xs text-neutral-300">Sem imagem</div>
-        )}
+        <img
+          src={cardImage}
+          alt={`${product.name}${selectedColor ? ` - ${selectedColor}` : ""}`}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
         {product.soldOut && (
           <div className="absolute bottom-0 inset-x-0 bg-white/90 text-center text-xs py-2 text-neutral-500">
-            Produto esgotado
+            Esgotado
           </div>
         )}
-      </div>
+      </Link>
 
       <div className="pt-4">
-        <h3 className="text-sm font-medium text-[#3a3a3a]">{product.name}</h3>
+        <h3 className="text-sm font-medium text-[#3a3a3a]">
+          <Link to={detailsUrl} className="hover:text-[#8b1538] transition-colors">
+            {product.name}
+          </Link>
+        </h3>
         <div className="flex items-baseline gap-2 mt-1">
-          <span className="text-[#8b1538] font-semibold">
-            {formatPrice(product.price)}
-          </span>
+          <span className="text-[#8b1538] font-semibold">{formatPrice(product.price)}</span>
           {product.oldPrice && (
-            <span className="text-xs text-neutral-400 line-through">
-              {formatPrice(product.oldPrice)}
-            </span>
+            <span className="text-xs text-neutral-400 line-through">{formatPrice(product.oldPrice)}</span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 mt-3">
-          {product.colors.map((color) => (
-            <button
-              key={color}
-              onClick={() => handleColorChange(color)}
-              aria-label={`Cor ${getColorName(color)}`}
-              title={getColorName(color)}
-              className={`w-4 h-4 rounded-full border ${
-                selectedColor === color
-                  ? "border-[#8b1538] ring-1 ring-[#8b1538] ring-offset-1"
-                  : "border-black/10"
-              }`}
-              style={{ backgroundColor: color }}
-            />
-          ))}
-        </div>
+        {colorOptions.length > 0 && (
+          <div className="mt-3">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {colorOptions.map((color) => (
+                <button
+                  key={color.name}
+                  type="button"
+                  onClick={() => setSelectedColor(color.name)}
+                  aria-label={`Cor ${color.name}`}
+                  aria-pressed={selectedColor === color.name}
+                  title={color.name}
+                  className={`w-4 h-4 rounded-full border ${
+                    selectedColor === color.name
+                      ? "border-[#8b1538] ring-1 ring-[#8b1538] ring-offset-1"
+                      : "border-black/10"
+                  }`}
+                  style={{ backgroundColor: color.hex }}
+                />
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-neutral-500">{selectedColor}</p>
+          </div>
+        )}
 
-        <div className="flex items-center gap-2 mt-3">
-          {product.sizes.map((size) => {
-            const sizeAvailable = isCombinationAvailable(product, size, selectedColor);
-
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          {sizesForColor.map((size) => {
+            const outOfStock = stockFor(size, selectedColor) <= 0;
             return (
               <button
                 key={size}
-                onClick={() => setSelectedSize(size)}
-                disabled={!sizeAvailable}
-                title={sizeAvailable ? undefined : "Indisponível nesta cor"}
+                type="button"
+                disabled={outOfStock}
+                onClick={() => setChosenSize(size)}
+                title={outOfStock ? "Esgotado nessa cor" : undefined}
                 className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full border transition-colors ${
-                  !sizeAvailable
+                  outOfStock
                     ? "border-neutral-200 text-neutral-300 line-through cursor-not-allowed"
                     : selectedSize === size
                     ? "bg-[#8b1538] border-[#8b1538] text-white"
@@ -142,17 +176,17 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
 
         <button
-          disabled={blocked}
+          disabled={unavailable}
           onClick={handleAddToCart}
           className={`mt-4 w-full text-sm font-medium py-2.5 rounded-full transition-colors ${
-            blocked
+            unavailable
               ? "bg-neutral-100 text-neutral-400 cursor-not-allowed"
               : added
               ? "bg-emerald-600 text-white"
               : "bg-[#8b1538] hover:bg-[#71102d] text-white"
           }`}
         >
-          {product.soldOut ? "Produto Esgotado" : !available ? "Combinação indisponível" : added ? "✓ Adicionado!" : "Adicionar ao Carrinho"}
+          {buttonLabel}
         </button>
         {notice && <p className="text-[11px] text-red-600 mt-2">{notice}</p>}
       </div>

@@ -43,84 +43,88 @@ export default function Main() {
 }
 
 const HERO_SLIDES = [
-  { image: banner1, alt: "Modelos vestindo peças de fitness wear La Rose" },
-  { image: banner2, alt: "Coleção La Rose" },
+    {
+        image: banner1,
+        alt: "Modelos vestindo peças de fitness wear La Rose",
+        link: "/catalogo?busca=" + encodeURIComponent("Neon"),
+    },
+    {
+        image: banner2,
+        alt: "Coleção La Rose",
+        link: "/catalogo?busca=" + encodeURIComponent("- Basic"),
+    },
 ];
 
 const HERO_INTERVAL = 5000;
 
 function Hero() {
-  
-  const [current, setCurrent] = useState(0);
-  const total = HERO_SLIDES.length;
+    const [current, setCurrent] = useState(0);
+    const total = HERO_SLIDES.length;
 
-  
-  function goPrev() {
-    setCurrent((prev) => (prev - 1 + total) % total);
-  }
-  function goNext() {
-    setCurrent((prev) => (prev + 1) % total);
-  }
+    function goPrev() {
+        setCurrent((prev) => (prev - 1 + total) % total);
+    }
+    function goNext() {
+        setCurrent((prev) => (prev + 1) % total);
+    }
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrent((prev) => (prev + 1) % total);
-    }, HERO_INTERVAL);
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrent((prev) => (prev + 1) % total);
+        }, HERO_INTERVAL);
 
-    
-    return () => clearInterval(timer);
-  }, [current, total]);
+        return () => clearInterval(timer);
+    }, [current, total]);
 
-  return (
-    <section className="relative h-[420px] md:h-[560px] overflow-hidden">
-      {HERO_SLIDES.map((slide, index) => (
-        <Link
-          key={index}
-          to="/catalogo"
-          aria-label="Ver o catálogo"
-          tabIndex={index === current ? 0 : -1}
-          className={`absolute inset-0 transition-opacity duration-700 ${
-            index === current ? "opacity-100" : "opacity-0 pointer-events-none"
-          }`}
-        >
-          <img src={slide.image} alt={slide.alt} className="w-full h-full object-cover" />
-        </Link>
-      ))}
+    return (
+        <section className="relative h-[420px] md:h-[560px] overflow-hidden">
+            {HERO_SLIDES.map((slide, index) => (
+                <Link
+                    key={index}
+                    to={slide.link}
+                    aria-label={`Ver: ${slide.alt}`}
+                    tabIndex={index === current ? 0 : -1}
+                    className={`absolute inset-0 transition-opacity duration-700 ${
+                        index === current ? "opacity-100" : "opacity-0 pointer-events-none"
+                    }`}
+                >
+                    <img src={slide.image} alt={slide.alt} className="w-full h-full object-cover" />
+                </Link>
+            ))}
 
-      <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/10 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/10 to-transparent pointer-events-none" />
 
-      <button
-        onClick={goPrev}
-        aria-label="Imagem anterior"
-        className="absolute left-3 md:left-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/70 hover:bg-white text-[#8b1538] flex items-center justify-center transition-colors"
-      >
-        <ChevronLeft size={22} />
-      </button>
+            <button
+                onClick={goPrev}
+                aria-label="Imagem anterior"
+                className="absolute left-3 md:left-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/70 hover:bg-white text-[#8b1538] flex items-center justify-center transition-colors"
+            >
+                <ChevronLeft size={22} />
+            </button>
 
-      <button
-        onClick={goNext}
-        aria-label="Próxima imagem"
-        className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/70 hover:bg-white text-[#8b1538] flex items-center justify-center transition-colors"
-      >
-        <ChevronRight size={22} />
-      </button>
+            <button
+                onClick={goNext}
+                aria-label="Próxima imagem"
+                className="absolute right-3 md:right-5 top-1/2 -translate-y-1/2 z-10 w-10 h-10 rounded-full bg-white/70 hover:bg-white text-[#8b1538] flex items-center justify-center transition-colors"
+            >
+                <ChevronRight size={22} />
+            </button>
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2">
-        {HERO_SLIDES.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setCurrent(index)}
-            aria-label={`Ir para imagem ${index + 1}`}
-            className={`h-2 rounded-full transition-all ${
-              index === current ? "w-6 bg-white" : "w-2 bg-white/50"
-            }`}
-          />
-        ))}
-      </div>
-    </section>
-  );
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+                {HERO_SLIDES.map((_, index) => (
+                    <button
+                        key={index}
+                        onClick={() => setCurrent(index)}
+                        aria-label={`Ir para imagem ${index + 1}`}
+                        className={`h-2 rounded-full transition-all ${
+                            index === current ? "w-6 bg-white" : "w-2 bg-white/50"
+                        }`}
+                    />
+                ))}
+            </div>
+        </section>
+    );
 }
-
 
 function CategoryShowcase() {
   return (
