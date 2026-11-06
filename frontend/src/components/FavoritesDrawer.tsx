@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import { X, Heart } from "lucide-react";
 import type { FavoriteItem } from "../types/favorite";
-import { colorHex } from "../services/adapters";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
