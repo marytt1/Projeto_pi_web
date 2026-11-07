@@ -2,7 +2,6 @@ import type { Product, ProductBadge, ProductCategory, ProductVariant, ColorOptio
 import type { CartItem } from "../types/cart";
 import type { FavoriteItem } from "../types/favorite";
 import { imageUrl } from "./api";
-import { COLOR_NAMES } from "../data/colors";
 import type { Order, OrderStatus } from "../types/order";
 import type { StockItem } from "../types/stock";
 import type { User } from "../types/user";
@@ -178,7 +177,6 @@ export function toProduct(p: ApiProduct): Product {
     images,
     soldOut: variants.length === 0 || totalStock === 0,
     colorOptions,
-    description: p.description ?? "",
     variants: variants.map(
       (v): ProductVariant => ({ id: String(v.id), size: v.size, colorName: v.color, stock: v.stock })
     ),
