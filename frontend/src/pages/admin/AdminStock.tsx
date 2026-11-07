@@ -4,18 +4,14 @@ import { Search, Plus, Pencil, Trash2, Check, X, ImagePlus } from "lucide-react"
 import AdminTopBar from "./AdminTopBar";
 import { useOrders } from "../../components/OrdersContext";
 import type { StockItem, StockCategory } from "../../types/stock";
-import { matchesSearch } from "../../components/Search";
+import { matchesSearch, normalizeText } from "../../components/Search";
 import ProductEditModal from "../../components/ProductEditModal";
 import { makePreview, revokePreview, validateImageFile } from "../../services/imageFile";
 import { useShop } from "../../components/ShopContext";
-import { normalizeText } from "../../components/Search";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
-
-// Categorias do catálogo da loja
-const CATEGORY_OPTIONS = ["Top", "Shorts", "Macaquinho", "Cropped", "Leggings"];
 
 // Rascunho da linha "Novo Produto"
 type NewItemDraft = {
@@ -52,14 +48,13 @@ export default function AdminStock() {
 
   const [newItem, setNewItem] = useState<NewItemDraft | null>(null);
   const [newItemError, setNewItemError] = useState("");
-  const [newImage, setNewImage] = useState<File | null>(null);
+  const [, setNewImage] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
 
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
-  const [saving, setSaving] = useState(false);
-  const [actionError, setActionError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [, setActionError] = useState("");
+  const [, setNotice] = useState("");
 
   useEffect(() => {
     reload();
@@ -146,7 +141,6 @@ export default function AdminStock() {
     const updatedProduct = field === "product" ? value : newItem.product;
     const updatedVariation = field === "variation" ? value : newItem.variation;
 
-    // Busca o produto correspondente na lista para pegar o ID real do banco
     const foundProduct = products.find((p) => normalizeText(p.name) === normalizeText(updatedProduct));
 
     let generatedSku = newItem.sku;
@@ -297,7 +291,6 @@ export default function AdminStock() {
                   </td>
                   <td colSpan={2} className="px-4 py-3 text-xs text-neutral-400">Vem do produto</td>
                   <td className="px-4 py-3">
-                    {/* CAMPO DE ESTOQUE APENAS INTEIROS */}
                     <input
                       type="number"
                       min="0"
@@ -384,7 +377,6 @@ export default function AdminStock() {
                   <td className="px-6 py-4">{formatPrice(item.price)}</td>
                   <td className="px-6 py-4">
                     {isEditing ? (
-                      /* CAMPO DE EDIÇÃO NA TABELA APENAS INTEIROS */
                       <input
                         type="number"
                         min="0"

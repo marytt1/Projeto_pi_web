@@ -2,6 +2,7 @@ import type { NavLink } from "../types/nav";
 
 // Links de navegação
 export const NAV_LINKS: NavLink[] = [
+  { label: "Home", href: "/"},
   { label: "Catálogo", href: "/catalogo" },
   { label: "Provador", href: "/#guia-tamanhos" },
   { label: "Novidades", href: "/#produtos" },

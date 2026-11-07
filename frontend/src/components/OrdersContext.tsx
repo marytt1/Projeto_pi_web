@@ -10,7 +10,7 @@ import { normalizeText } from "../components/Search";
 import { useAuth } from "./AuthContext";
 import { useShop } from "./ShopContext";
 
-// Dados que o admin pode trocar em um produto
+// Dados que o admin pode trocar em um produto (edição rápida)
 export type ProductEditData = {
   name: string;
   description: string;
@@ -19,8 +19,6 @@ export type ProductEditData = {
 };
 
 // Estado global de pedidos e estoque
-// Pedidos e estoque só são carregados para administradores; para os demais as listas ficam vazias.
-// As ações são assíncronas e devolvem { ok, message }: mostre a message quando ok for false.
 export type ProductInput = {
   name: string;
   description: string;
@@ -35,23 +33,21 @@ export type PendingImage = { file: File; color: string | null };
 type OrdersContextType = {
   orders: Order[];
   stock: StockItem[];
-  dashboard: Dashboard | null; // números prontos do painel (vendas de hoje, pendentes, alertas de estoque)
+  dashboard: Dashboard | null; 
   loading: boolean;
   error: string | null;
   reload: () => Promise<void>;
 
-  // Cria o pedido com o carrinho atual. Em caso de sucesso: result.whatsappUrl e result.orderCode
   placeOrder: () => Promise<ActionResult>;
-  // Aguardando -> Confirmado (baixa o estoque) -> Enviado -> Entregue
   advanceOrder: (orderId: string) => Promise<ActionResult>;
-  // image: foto do produto (opcional); só é usada quando o produto ainda não existe
   addStockItem: (item: StockItem, image?: File | null) => Promise<ActionResult>;
-  // Edita nome, categoria, preço, descrição e imagem de um produto (vale para todas as variações)
-  updateProduct: (productId: string, data: ProductEditData, image?: File | null) => Promise<ActionResult>;
+  updateProduct: {
+    (id: string, data: ProductInput, images?: PendingImage[]): Promise<ActionResult>;
+    (productId: string, data: ProductEditData, image?: File | null): Promise<ActionResult>;
+  };
   setStockQuantity: (sku: string, quantity: number) => Promise<ActionResult>;
   removeStockItem: (sku: string) => Promise<ActionResult>;
   createProduct: (data: ProductInput, images?: PendingImage[]) => Promise<ActionResult>;
-  updateProduct: (id: string, data: ProductInput, images?: PendingImage[]) => Promise<ActionResult>;
   deleteProduct: (id: string) => Promise<ActionResult>;
   removeProductImage: (productId: string, imageId: string) => Promise<ActionResult>;
 };
@@ -125,27 +121,6 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Troca nome, categoria, preço, descrição e (opcionalmente) a imagem do produto
-  async function updateProduct(productId: string, data: ProductEditData, image?: File | null): Promise<ActionResult> {
-    const id = Number(productId);
-    if (!Number.isInteger(id)) return { ok: false, message: "Produto inválido." };
-
-    try {
-      const body: Record<string, unknown> = { ...data };
-
-      if (image) {
-        const uploaded = (await adminApi.uploadImage(image)) as { imageUrl: string };
-        body.image_url = uploaded.imageUrl;
-      }
-
-      await adminApi.updateProduct(id, body);
-      await refreshAfterStockChange(); // estoque, painel e catálogo da loja mostram o preço e a imagem novos
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, message: errorMessage(e) };
-    }
-  }
-
   async function setStockQuantity(sku: string, quantity: number): Promise<ActionResult> {
     const row = admin.stock.find((r) => r.sku === sku);
     if (!row) return { ok: false, message: "Item de estoque não encontrado." };
@@ -168,7 +143,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     }
   }
 
-     // Envia as fotos agrupadas por cor (uma requisição por cor)
+  // Envia as fotos agrupadas por cor (uma requisição por cor)
   async function uploadImages(productId: number, images: PendingImage[]) {
     const groups = new Map<string, File[]>();
     for (const { file, color } of images) {
@@ -204,23 +179,49 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }
 
-  async function updateProduct(id: string, data: ProductInput, images: PendingImage[] = []): Promise<ActionResult> {
+  // Edita um produto. Se o 3º argumento for uma LISTA, envia as fotos (cada uma com sua cor).
+  // Se for um único arquivo (ou nada), troca só a imagem de capa, como na edição rápida em modal.
+  async function updateProduct(
+    id: string,
+    data: ProductInput | ProductEditData,
+    photos: PendingImage[] | File | null = null
+  ): Promise<ActionResult> {
+    const productId = Number(id);
+    if (!Number.isInteger(productId)) return { ok: false, message: "Produto inválido." };
+
+    if (Array.isArray(photos)) {
+      try {
+        await adminApi.updateProduct(productId, data);
+      } catch (e) {
+        return { ok: false, message: errorMessage(e) };
+      }
+
+      if (photos.length > 0) {
+        try {
+          await uploadImages(productId, photos);
+        } catch (e) {
+          await refreshAfterStockChange();
+          return { ok: false, message: `Produto atualizado, mas as fotos falharam: ${errorMessage(e)}` };
+        }
+      }
+      await refreshAfterStockChange();
+      return { ok: true };
+    }
+
     try {
-      await adminApi.updateProduct(Number(id), data);
+      const body: Record<string, unknown> = { ...data };
+
+      if (photos) {
+        const uploaded = (await adminApi.uploadImage(photos)) as { imageUrl: string };
+        body.image_url = uploaded.imageUrl;
+      }
+
+      await adminApi.updateProduct(productId, body);
+      await refreshAfterStockChange(); // estoque, painel e catálogo da loja mostram o preço e a imagem novos
+      return { ok: true };
     } catch (e) {
       return { ok: false, message: errorMessage(e) };
     }
-
-    if (images.length > 0) {
-      try {
-        await uploadImages(Number(id), images);
-      } catch (e) {
-        await refreshAfterStockChange();
-        return { ok: false, message: `Produto atualizado, mas as fotos falharam: ${errorMessage(e)}` };
-      }
-    }
-    await refreshAfterStockChange();
-    return { ok: true };
   }
 
   async function removeProductImage(productId: string, imageId: string): Promise<ActionResult> {
@@ -242,7 +243,7 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
       return { ok: false, message: errorMessage(e) };
     }
   }
- 
+
   return (
     <OrdersContext.Provider
       value={{
@@ -259,9 +260,8 @@ export function OrdersProvider({ children }: { children: ReactNode }) {
         setStockQuantity,
         removeStockItem,
         createProduct,
-        updateProduct,
         removeProductImage,
-        deleteProduct
+        deleteProduct,
       }}
     >
       {children}

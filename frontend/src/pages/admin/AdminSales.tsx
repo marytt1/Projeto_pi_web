@@ -12,7 +12,7 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-const PAGE_SIZE = 10; // pedidos por página
+const PAGE_SIZE = 10; 
 
 const ACTION_LABEL: Record<OrderStatus, string | null> = {
   Aguardando: "Confirmar Pgto & Baixar Estoque",
@@ -28,15 +28,13 @@ export default function AdminSales() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const [busyId, setBusyId] = useState<string | null>(null); // pedido sendo atualizado na API
+  const [busyId, setBusyId] = useState<string | null>(null); 
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Ao abrir a tela, busca os pedidos mais recentes na API
   useEffect(() => {
     reload();
   }, [reload]);
 
-  // Avança o pedido na API. Se faltar estoque (ou outro problema), a mensagem da API aparece na tela.
   async function handleAdvance(order: Order) {
     setBusyId(order.id);
     setMessage(null);
@@ -57,24 +55,10 @@ export default function AdminSales() {
     }
   }
 
-  const [actionError, setActionError] = useState("");
-  const [advancingId, setAdvancingId] = useState<string | null>(null);
-
-  async function handleAdvance(orderId: string) {
-    setActionError("");
-    setAdvancingId(orderId);
-    const result = await advanceOrder(orderId);
-    setAdvancingId(null);
-    if (!result.ok) {
-      setActionError(result.message ?? "Não foi possível atualizar o pedido.");
-    }
-  
-  }
   const filteredOrders = sortNewestFirst(orders).filter((order) =>
     matchesSearch(search, order.id, order.customerName, order.customerEmail, summarizeItems(order.items), order.status)
   );
 
-  // Paginação: mostra PAGE_SIZE pedidos por vez, com setinhas para as outras páginas
   const pageCount = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const pageOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -152,8 +136,8 @@ export default function AdminSales() {
                   <td className="px-6 py-4">
                     {actionLabel && (
                       <button
-                        onClick={() => handleAdvance(order.id)}
-                        disabled={advancingId === order.id}
+                        onClick={() => handleAdvance(order)}
+                        disabled={busyId === order.id}
                         className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                           order.status === "Aguardando"
                             ? "bg-[#8b1538] hover:bg-[#71102d] text-white"
@@ -161,7 +145,7 @@ export default function AdminSales() {
                         }`}
                       >
                         <Check size={13} />
-                        {advancingId === order.id ? "Atualizando..." : actionLabel}
+                        {busyId === order.id ? "Atualizando..." : actionLabel}
                       </button>
                     )}
                   </td>

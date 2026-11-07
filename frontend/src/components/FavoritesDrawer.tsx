@@ -48,7 +48,6 @@ export default function FavoritesDrawer({ items, onClose, onRemove }: FavoritesD
                   {item.name}
                 </Link>
 
-                
                 <p className="text-sm font-semibold text-[#8b1538] mt-0.5">{formatPrice(item.price)}</p>
               </div>
               <button

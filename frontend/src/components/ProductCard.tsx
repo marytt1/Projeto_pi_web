@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { Heart } from "lucide-react";
 import type { Product, ProductBadgeTone } from "../types/product";
 import { useShop } from "./ShopContext";
 
@@ -18,12 +19,14 @@ function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+// Compara nomes de cor sem diferenciar
 const sameColor = (a: string | null | undefined, b: string) =>
   a !== null && a !== undefined && a.trim().toLowerCase() === b.trim().toLowerCase();
 
 // Componente do Card de produto em destaque que exibe foto, selo personalizado, preço com desconto, opções de cores, tamanhos e botão de compra
 export default function ProductCard({ product }: ProductCardProps) {
-  const { addToCart } = useShop();
+  const { addToCart, toggleFavorite, isFavorite } = useShop();
+  const favorite = isFavorite(product.id);
 
   const colorOptions = product.colorOptions ?? [];
   const variants = product.variants ?? [];
@@ -37,6 +40,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     return variants.find((v) => v.size === size && v.colorName === colorName)?.stock ?? 0;
   }
 
+  // Só os tamanhos que existem para a cor escolhida
   const sizesForColor = product.sizes.filter((size) =>
     variants.some((v) => v.colorName === selectedColor && v.size === size)
   );
@@ -45,6 +49,7 @@ export default function ProductCard({ product }: ProductCardProps) {
     ? chosenSize
     : (sizesForColor.find((size) => stockFor(size, selectedColor) > 0) ?? sizesForColor[0] ?? "");
 
+  // Foto do card: a primeira da cor escolhida; sem foto da cor, a primeira geral; senão a capa
   const images = product.images ?? [];
   const colorImage = images.find((i) => sameColor(i.colorName, selectedColor));
   const generalImage = images.find((i) => i.colorName === null);
@@ -53,11 +58,17 @@ export default function ProductCard({ product }: ProductCardProps) {
   const selectedStock = selectedSize ? stockFor(selectedSize, selectedColor) : 0;
   const unavailable = product.soldOut || selectedStock <= 0;
 
+  // Link dos detalhes, já levando a cor e o tamanho escolhidos
   const params = new URLSearchParams();
   if (selectedColor) params.set("cor", selectedColor);
   if (selectedSize) params.set("tamanho", selectedSize);
   const query = params.toString();
   const detailsUrl = `/produto/${product.id}${query ? `?${query}` : ""}`;
+
+  // Favorita ou desfavorita (se não estiver logada, o site pede o login)
+  function handleToggleFavorite() {
+    toggleFavorite(product);
+  }
 
   function handleAddToCart() {
     setNotice("");
@@ -83,38 +94,51 @@ export default function ProductCard({ product }: ProductCardProps) {
 
   return (
     <article className="group">
-      <Link
-        to={detailsUrl}
-        aria-label={`Ver detalhes de ${product.name}`}
-        className="relative block overflow-hidden bg-neutral-100 aspect-[3/4]"
-      >
-        {product.badge && (
-          <span
-            className={`absolute top-3 left-3 z-10 text-[10px] font-medium px-2.5 py-1 rounded-full ${
-              BADGE_TONE_CLASSES[product.badge.tone]
-            }`}
-          >
-            {product.badge.label}
-          </span>
-        )}
-        <span className="absolute top-3 right-3 z-10 text-[10px] font-medium text-white/90">
-          {product.category}
-        </span>
-        <img
-          src={cardImage}
-          alt={`${product.name}${selectedColor ? ` - ${selectedColor}` : ""}`}
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-        {product.soldOut && (
-          <div className="absolute bottom-0 inset-x-0 bg-white/90 text-center text-xs py-2 text-neutral-500">
-            Esgotado
-          </div>
-        )}
-      </Link>
+      <div className="relative overflow-hidden bg-neutral-100 aspect-[3/4]">
+        <Link
+          to={detailsUrl}
+          aria-label={`Ver detalhes de ${product.name}`}
+          className="absolute inset-0 block"
+        >
+          {product.badge && (
+            <span
+              className={`absolute top-3 left-3 z-10 text-[10px] font-medium px-2.5 py-1 rounded-full ${
+                BADGE_TONE_CLASSES[product.badge.tone]
+              }`}
+            >
+              {product.badge.label}
+            </span>
+          )}
+          <img
+            src={cardImage}
+            alt={`${product.name}${selectedColor ? ` - ${selectedColor}` : ""}`}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+          {product.soldOut && (
+            <div className="absolute bottom-0 inset-x-0 bg-white/90 text-center text-xs py-2 text-neutral-500">
+              Esgotado
+            </div>
+          )}
+        </Link>
+
+        <button
+          type="button"
+          onClick={handleToggleFavorite}
+          aria-label={favorite ? "Remover dos favoritos" : "Favoritar"}
+          aria-pressed={favorite}
+          className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-white/90 hover:bg-white shadow-sm flex items-center justify-center transition-colors"
+        >
+          <Heart
+            size={15}
+            className={favorite ? "fill-[#8b1538] text-[#8b1538]" : "text-neutral-500"}
+          />
+        </button>
+      </div>
 
       <div className="pt-4">
+        <p className="text-[10px] uppercase tracking-widest text-neutral-400 mb-0.5">{product.category}</p>
         <h3 className="text-sm font-medium text-[#3a3a3a]">
           <Link to={detailsUrl} className="hover:text-[#8b1538] transition-colors">
             {product.name}
