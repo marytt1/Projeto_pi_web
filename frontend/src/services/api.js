@@ -173,8 +173,6 @@ export const admin = {
     confirmPayment: (orderId) => request(`${PATHS.admin}/orders/${orderId}/confirm-payment`, { method: 'PATCH' }),
     setOrderStatus: (orderId, status) =>
         request(`${PATHS.admin}/orders/${orderId}/status`, { method: 'PATCH', body: { status } }),
-    // Rota para excluir o pedido no painel admin
-    deleteOrder: (orderId) => request(`${PATHS.admin}/orders/${orderId}`, { method: 'DELETE' }),
 
     // Estoque
     stock: (search) => request(`${PATHS.admin}/stock`, { query: { search } }),
@@ -210,3 +208,4 @@ export const sizeGuide = {
   calculate: (bust, waist, hip) =>
     request(`${PATHS.users}/size-guide`, { method: 'POST', body: { busto: bust, cintura: waist, quadril: hip } }),
 };
+

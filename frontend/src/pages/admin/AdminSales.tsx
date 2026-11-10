@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Check, Trash2 } from "lucide-react";
+import { Search, Check } from "lucide-react";
 import AdminTopBar from "./AdminTopBar";
 import StatusBadge from "../../components/StatusBadge";
 import { useOrders } from "../../components/OrdersContext";
@@ -7,7 +7,6 @@ import { matchesSearch } from "../../components/Search";
 import { sortNewestFirst, summarizeItems } from "../../components/Orders";
 import type { Order, OrderStatus } from "../../types/order";
 import Pagination from "../../components/Pagination";
-import { admin } from "../../services/api";
 
 function formatPrice(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -23,8 +22,9 @@ const ACTION_LABEL: Record<OrderStatus, string | null> = {
   Cancelado: null,
 };
 
+// Página de vendas que exibe a gestão da listagem de vendas com busca e atualização do status de pagamento dos pedidos
 export default function AdminSales() {
-  const { orders, loading, error, reload } = useOrders();
+  const { orders, advanceOrder, loading, error, reload } = useOrders();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -39,59 +39,19 @@ export default function AdminSales() {
     setBusyId(order.id);
     setMessage(null);
 
-    try {
-      if (order.status === "Aguardando") {
-        // Dispara a rota PATCH /admin/orders/:id/confirm-payment (baixa estoque + e-mail automático)
-        await admin.confirmPayment(order.id);
-        setMessage({
-          ok: true,
-          text: `Pagamento do pedido ${order.id} confirmado, estoque atualizado e e-mail enviado com sucesso!`,
-        });
-      } else if (order.status === "Confirmado") {
-        // Dispara a rota PATCH /admin/orders/:id/status para "Enviado"
-        await admin.setOrderStatus(order.id, "Enviado");
-        setMessage({
-          ok: true,
-          text: `Pedido ${order.id} atualizado para "Enviado".`,
-        });
-      } else if (order.status === "Enviado") {
-        // Dispara a rota PATCH /admin/orders/:id/status para "Entregue"
-        await admin.setOrderStatus(order.id, "Entregue");
-        setMessage({
-          ok: true,
-          text: `Pedido ${order.id} atualizado para "Entregue".`,
-        });
-      }
+    const result = await advanceOrder(order.id);
+    setBusyId(null);
 
-      // Recarrega a listagem de pedidos para refletir o novo status e estoque
-      await reload();
-    } catch (err: any) {
+    if (result.ok) {
       setMessage({
-        ok: false,
-        text: err.message || "Não foi possível atualizar o pedido.",
+        ok: true,
+        text:
+          order.status === "Aguardando"
+            ? `Pagamento do pedido ${order.id} confirmado e estoque atualizado.`
+            : `Pedido ${order.id} atualizado.`,
       });
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  // Função para apagar o pedido
-  async function handleDelete(order: Order) {
-    if (!window.confirm(`Tem certeza que deseja excluir o pedido ${order.id}?`)) {
-      return;
-    }
-
-    setBusyId(order.id);
-    setMessage(null);
-
-    try {
-      await admin.deleteOrder(order.id);
-      setMessage({ ok: true, text: `Pedido ${order.id} excluído com sucesso.` });
-      await reload();
-    } catch (err: any) {
-      setMessage({ ok: false, text: err.message || "Não foi possível excluir o pedido." });
-    } finally {
-      setBusyId(null);
+    } else {
+      setMessage({ ok: false, text: result.message ?? "Não foi possível atualizar o pedido." });
     }
   }
 
@@ -174,32 +134,20 @@ export default function AdminSales() {
                     <StatusBadge status={order.status} />
                   </td>
                   <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {actionLabel && (
-                        <button
-                          onClick={() => handleAdvance(order)}
-                          disabled={busyId === order.id}
-                          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                            order.status === "Aguardando"
-                              ? "bg-[#8b1538] hover:bg-[#71102d] text-white"
-                              : "border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0]"
-                          }`}
-                        >
-                          <Check size={13} />
-                          {busyId === order.id ? "Atualizando..." : actionLabel}
-                        </button>
-                      )}
-
-                      {/* Botão de Excluir */}
+                    {actionLabel && (
                       <button
-                        onClick={() => handleDelete(order)}
+                        onClick={() => handleAdvance(order)}
                         disabled={busyId === order.id}
-                        title="Excluir pedido"
-                        className="p-2 border border-neutral-300 text-neutral-500 hover:text-red-600 hover:border-red-300 rounded-full transition-colors disabled:opacity-50"
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-full whitespace-nowrap transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                          order.status === "Aguardando"
+                            ? "bg-[#8b1538] hover:bg-[#71102d] text-white"
+                            : "border border-[#8b1538] text-[#8b1538] hover:bg-[#faf1f0]"
+                        }`}
                       >
-                        <Trash2 size={15} />
+                        <Check size={13} />
+                        {busyId === order.id ? "Atualizando..." : actionLabel}
                       </button>
-                    </div>
+                    )}
                   </td>
                 </tr>
               );
