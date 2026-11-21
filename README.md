@@ -9,7 +9,7 @@ Este repositório contém a documentação e o código do frontend do Grupo 10.
 
 ## Sobre o Projeto
 
-Sistema web voltado para a gestão e vendas dos produtos de moda fitness da loja **La Rose**, de Santa Cruz das Palmeiras - SP. A aplicação conta com as telas: Home com as informações principais exibindo categorias, produtos em destaque, guia de tamanhos, vídeos em estilo de feed do Instagram, entre outras informações; Catálogo com filtros; Detalhes do produto; Carrinho de compras (com a finalização do pedido via WhatsApp); Login; Cadastro e, o Painel Administrativo com as abas de Visão Geral, Vendas e Estoque.
+Sistema web voltado para a gestão e vendas dos produtos de moda fitness da loja **La Rose**, de Santa Cruz das Palmeiras - SP. A aplicação conta com as telas: Home com as informações principais exibindo categorias, produtos em destaque, guia de tamanhos, vídeos em estilo de feed do Instagram, entre outras informações; Catálogo com filtros; Detalhes do produto; Carrinho de compras (com a finalização do pedido via WhatsApp); Login; Cadastro e, o Painel Administrativo com as abas de Visão Geral, Vendas, Estoque e Produtos.
 
 ## Tecnologias Utilizadas
 
